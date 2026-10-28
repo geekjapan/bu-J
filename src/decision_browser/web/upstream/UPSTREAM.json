@@ -1,0 +1,16 @@
+{
+  "repository": "https://github.com/browser-use/jev-ultrafast",
+  "commit": "1231850a0bf1a0c0341fe408ef1668dbbfdfac46",
+  "license": "MIT",
+  "original_sha256": {
+    "jev_ultrafast/browser.py": "ee08dafa93d731bd292aa0263a578a29c8001cf22eef3c59fe44a159649155ee",
+    "jev_ultrafast/snapshot.js": "e50473501c8fb8e70f3b21866d987393e3f2315c639d638bd477d170e81ed78d",
+    "LICENSE": "5afa3d97bf1e6f998d587fa101e3fe0d0c416840b7fe77bcd6ae97690a334631"
+  },
+  "edits": [
+    "snapshot.js and LICENSE copied byte-identically",
+    "browser.py adapts synchronous CDP websocket transport without discovery or daemon",
+    "Owned target lifecycle, explicit scoped task policy and per-node metadata rechecks for both arms",
+    "PNG screenshot API and CDP command counts/browser version; preserve upstream freshness, settling, hit testing and native select uncertainty"
+  ]
+}

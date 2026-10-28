@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "skill_id": "search-results",
+  "version": "search-results-v1",
+  "status": "approved",
+  "implementation": "builtin-search-results-v1",
+  "approval_record": "synthetic-fixture-only-v1",
+  "allowed_origins": [
+    "https://fixture.test"
+  ],
+  "signature": "8335645378619d3f136c22aa2031fc661b25b47fc0f36e3ae74dc07aa628bfc9"
+}

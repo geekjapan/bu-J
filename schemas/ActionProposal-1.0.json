@@ -1,0 +1,160 @@
+{
+  "$defs": {
+    "Parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Query"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "wait_ms": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wait Ms"
+        },
+        "page_index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page Index"
+        }
+      },
+      "title": "Parameters",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "action_id": {
+      "title": "Action Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "OBSERVE",
+        "EXTRACT",
+        "NAVIGATE",
+        "WAIT",
+        "CLICK_NEXT",
+        "FILL_SEARCH"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "skill_version": {
+      "default": "search-results-v1",
+      "title": "Skill Version",
+      "type": "string"
+    },
+    "parameters": {
+      "$ref": "#/$defs/Parameters",
+      "default": {
+        "query": null,
+        "url": null,
+        "wait_ms": null,
+        "page_index": null
+      }
+    },
+    "element_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Element Ref"
+    },
+    "preconditions": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Preconditions",
+      "type": "array"
+    },
+    "postconditions": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Postconditions",
+      "type": "array"
+    },
+    "risk_class": {
+      "default": "R1",
+      "enum": [
+        "R0",
+        "R1",
+        "R2",
+        "R3"
+      ],
+      "title": "Risk Class",
+      "type": "string"
+    },
+    "retry_class": {
+      "default": "RECONCILE",
+      "enum": [
+        "READ_ONLY",
+        "RECONCILE"
+      ],
+      "title": "Retry Class",
+      "type": "string"
+    },
+    "observation_id": {
+      "title": "Observation Id",
+      "type": "string"
+    },
+    "candidate_set_digest": {
+      "default": "",
+      "title": "Candidate Set Digest",
+      "type": "string"
+    }
+  },
+  "required": [
+    "action_id",
+    "kind",
+    "observation_id"
+  ],
+  "title": "ActionProposal",
+  "type": "object"
+}

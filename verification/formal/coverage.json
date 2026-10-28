@@ -1,0 +1,34 @@
+{
+  "sync_commit": null,
+  "sync_note": "Repository has unborn main; no commit existed at initial confirmation. Set a real commit only after reviewing correspondence at that commit.",
+  "source_sha256": {
+    "src/decision_browser/audit.py": "920ed37d617c009feab9ce315b6dd1d82ed6114b989669475922b429146657fe",
+    "src/decision_browser/executor.py": "1565e63345848227181ba0ab5aa04b1f375647ca18a216e44151dc0aa49ba0ca",
+    "src/decision_browser/controller.py": "e501537b2ab32cefdb190fe5b9815bf3b76de43b80d2b574ec4d0a1a50796f6d",
+    "src/decision_browser/drivers/mock.py": "0363595002e8d6e83093ed815908e13c7ee1ecf50db57d1224a0d4b77c9e68f8",
+    "src/decision_browser/contracts.py": "e4c274ea18a3191ccbdc7f48895d3f36b6a1dcd7b353d1c4bdfa47a7af65dbda"
+  },
+  "functions": {
+    "src/decision_browser/audit.py": [
+      "Journal.__init__",
+      "Journal.operation_key",
+      "Journal.prepare",
+      "Journal.transition",
+      "Journal.unresolved"
+    ],
+    "src/decision_browser/executor.py": [
+      "BrowserLane.acquire",
+      "Executor.execute"
+    ],
+    "src/decision_browser/controller.py": [
+      "Controller.run"
+    ],
+    "src/decision_browser/drivers/mock.py": [
+      "MockBrowserDriver.execute"
+    ],
+    "src/decision_browser/contracts.py": [
+      "canonical",
+      "digest"
+    ]
+  }
+}

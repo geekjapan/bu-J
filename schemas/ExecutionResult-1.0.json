@@ -1,0 +1,63 @@
+{
+  "$defs": {
+    "Record": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "updated_at": {
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "updated_at"
+      ],
+      "title": "Record",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "action_id": {
+      "title": "Action Id",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "OK",
+        "FAILED",
+        "UNKNOWN"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "records": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Record"
+      },
+      "title": "Records",
+      "type": "array"
+    },
+    "reason": {
+      "default": "",
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "action_id",
+    "status"
+  ],
+  "title": "ExecutionResult",
+  "type": "object"
+}

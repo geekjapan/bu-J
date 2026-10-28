@@ -1,0 +1,14 @@
+**
+!verification/
+!verification/chrome/
+!verification/chrome/Dockerfile
+!verification/chrome/container.py
+!fixtures/
+!fixtures/webapp/
+!fixtures/webapp/server.py
+!fixtures/web_benchmark/
+!fixtures/web_benchmark/fixture.html
+!verification/web_benchmark/
+!verification/web_benchmark/Dockerfile
+!verification/web_benchmark/container.py
+!verification/web_benchmark/proxy.py

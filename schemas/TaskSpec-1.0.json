@@ -1,0 +1,125 @@
+{
+  "$defs": {
+    "Budget": {
+      "additionalProperties": false,
+      "properties": {
+        "max_steps": {
+          "default": 200,
+          "maximum": 10000,
+          "minimum": 1,
+          "title": "Max Steps",
+          "type": "integer"
+        },
+        "deadline_seconds": {
+          "default": 300.0,
+          "exclusiveMinimum": 0,
+          "maximum": 3600,
+          "title": "Deadline Seconds",
+          "type": "number"
+        },
+        "max_cost_units": {
+          "default": 100,
+          "minimum": 0,
+          "title": "Max Cost Units",
+          "type": "integer"
+        },
+        "max_no_progress_steps": {
+          "default": 3,
+          "minimum": 1,
+          "title": "Max No Progress Steps",
+          "type": "integer"
+        }
+      },
+      "title": "Budget",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "task_id": {
+      "minLength": 1,
+      "title": "Task Id",
+      "type": "string"
+    },
+    "tenant_id": {
+      "default": "fixture",
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "principal_id": {
+      "default": "fixture-user",
+      "title": "Principal Id",
+      "type": "string"
+    },
+    "goal": {
+      "default": "Collect fixture search results",
+      "title": "Goal",
+      "type": "string"
+    },
+    "phase": {
+      "default": "search",
+      "enum": [
+        "search",
+        "collect"
+      ],
+      "title": "Phase",
+      "type": "string"
+    },
+    "allowed_origins": {
+      "default": [
+        "https://fixture.test"
+      ],
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Origins",
+      "type": "array"
+    },
+    "data_classification": {
+      "default": "SYNTHETIC",
+      "enum": [
+        "PUBLIC",
+        "SYNTHETIC",
+        "CONFIDENTIAL"
+      ],
+      "title": "Data Classification",
+      "type": "string"
+    },
+    "policy_version": {
+      "default": "poc-v1",
+      "title": "Policy Version",
+      "type": "string"
+    },
+    "workflow_version": {
+      "default": "search-results-v1",
+      "title": "Workflow Version",
+      "type": "string"
+    },
+    "query": {
+      "default": "",
+      "maxLength": 200,
+      "title": "Query",
+      "type": "string"
+    },
+    "budget": {
+      "$ref": "#/$defs/Budget",
+      "default": {
+        "max_steps": 200,
+        "deadline_seconds": 300.0,
+        "max_cost_units": 100,
+        "max_no_progress_steps": 3
+      }
+    }
+  },
+  "required": [
+    "task_id"
+  ],
+  "title": "TaskSpec",
+  "type": "object"
+}

@@ -1,0 +1,30 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "session_id": {
+      "title": "Session Id",
+      "type": "string"
+    },
+    "tab_id": {
+      "title": "Tab Id",
+      "type": "string"
+    },
+    "fencing_token": {
+      "minimum": 1,
+      "title": "Fencing Token",
+      "type": "integer"
+    },
+    "expires_monotonic": {
+      "title": "Expires Monotonic",
+      "type": "number"
+    }
+  },
+  "required": [
+    "session_id",
+    "tab_id",
+    "fencing_token",
+    "expires_monotonic"
+  ],
+  "title": "Lease",
+  "type": "object"
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "version": "poc-v1",
+  "allowed_origins": [
+    "https://fixture.test"
+  ],
+  "data_classification": [
+    "SYNTHETIC"
+  ],
+  "max_risk_class": "R1",
+  "allowed_actions": [
+    "OBSERVE",
+    "EXTRACT",
+    "NAVIGATE",
+    "WAIT",
+    "CLICK_NEXT",
+    "FILL_SEARCH"
+  ],
+  "external_calls_enabled": false,
+  "browser_network_control": "requires isolated deployment enforcement; not provided by mock"
+}

@@ -1,0 +1,233 @@
+{
+  "$defs": {
+    "Element": {
+      "additionalProperties": false,
+      "properties": {
+        "element_ref": {
+          "title": "Element Ref",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "frame_ref": {
+          "const": "main",
+          "default": "main",
+          "title": "Frame Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "element_ref",
+        "role",
+        "name"
+      ],
+      "title": "Element",
+      "type": "object"
+    },
+    "Facts": {
+      "additionalProperties": false,
+      "properties": {
+        "page_index": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Page Index",
+          "type": "integer"
+        },
+        "has_next": {
+          "default": false,
+          "title": "Has Next",
+          "type": "boolean"
+        },
+        "searched": {
+          "default": false,
+          "title": "Searched",
+          "type": "boolean"
+        },
+        "query": {
+          "default": "",
+          "title": "Query",
+          "type": "string"
+        },
+        "records": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Record"
+          },
+          "title": "Records",
+          "type": "array"
+        },
+        "total_records": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Total Records",
+          "type": "integer"
+        },
+        "supported": {
+          "default": true,
+          "title": "Supported",
+          "type": "boolean"
+        },
+        "requires_human": {
+          "default": false,
+          "title": "Requires Human",
+          "type": "boolean"
+        }
+      },
+      "title": "Facts",
+      "type": "object"
+    },
+    "Record": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "updated_at": {
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "updated_at"
+      ],
+      "title": "Record",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "session_id": {
+      "title": "Session Id",
+      "type": "string"
+    },
+    "tab_id": {
+      "title": "Tab Id",
+      "type": "string"
+    },
+    "navigation_epoch": {
+      "minimum": 0,
+      "title": "Navigation Epoch",
+      "type": "integer"
+    },
+    "observation_id": {
+      "title": "Observation Id",
+      "type": "string"
+    },
+    "captured_at": {
+      "format": "date-time",
+      "title": "Captured At",
+      "type": "string"
+    },
+    "captured_monotonic": {
+      "title": "Captured Monotonic",
+      "type": "number"
+    },
+    "valid_for_ms": {
+      "default": 2000,
+      "exclusiveMinimum": 0,
+      "maximum": 10000,
+      "title": "Valid For Ms",
+      "type": "integer"
+    },
+    "origin": {
+      "title": "Origin",
+      "type": "string"
+    },
+    "page_kind": {
+      "enum": [
+        "search",
+        "results",
+        "unsupported",
+        "login"
+      ],
+      "title": "Page Kind",
+      "type": "string"
+    },
+    "phase": {
+      "enum": [
+        "search",
+        "collect"
+      ],
+      "title": "Phase",
+      "type": "string"
+    },
+    "semantic_digest": {
+      "title": "Semantic Digest",
+      "type": "string"
+    },
+    "transaction_digest": {
+      "title": "Transaction Digest",
+      "type": "string"
+    },
+    "elements": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Element"
+      },
+      "title": "Elements",
+      "type": "array"
+    },
+    "facts": {
+      "$ref": "#/$defs/Facts"
+    },
+    "redaction_profile": {
+      "default": "public-fixture-v1",
+      "enum": [
+        "public-fixture-v1",
+        "persisted-redacted-v1"
+      ],
+      "title": "Redaction Profile",
+      "type": "string"
+    },
+    "truncated": {
+      "default": false,
+      "title": "Truncated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "task_id",
+    "session_id",
+    "tab_id",
+    "navigation_epoch",
+    "observation_id",
+    "captured_at",
+    "captured_monotonic",
+    "origin",
+    "page_kind",
+    "phase",
+    "semantic_digest",
+    "transaction_digest",
+    "facts"
+  ],
+  "title": "Observation",
+  "type": "object"
+}

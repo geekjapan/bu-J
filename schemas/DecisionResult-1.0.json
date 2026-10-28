@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "Probability": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "probability": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Probability",
+          "type": "number"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "probability"
+      ],
+      "title": "Probability",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "provider": {
+      "title": "Provider",
+      "type": "string"
+    },
+    "requested_model": {
+      "title": "Requested Model",
+      "type": "string"
+    },
+    "resolved_model": {
+      "title": "Resolved Model",
+      "type": "string"
+    },
+    "question_version": {
+      "default": "next-action-v1",
+      "title": "Question Version",
+      "type": "string"
+    },
+    "choice": {
+      "title": "Choice",
+      "type": "string"
+    },
+    "probabilities": {
+      "items": {
+        "$ref": "#/$defs/Probability"
+      },
+      "title": "Probabilities",
+      "type": "array"
+    },
+    "provider_confidence": {
+      "default": 1.0,
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Provider Confidence",
+      "type": "number"
+    },
+    "state_supported": {
+      "default": 1.0,
+      "maximum": 1,
+      "minimum": 0,
+      "title": "State Supported",
+      "type": "number"
+    },
+    "latency_ms": {
+      "default": 0.0,
+      "minimum": 0,
+      "title": "Latency Ms",
+      "type": "number"
+    },
+    "usage": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Usage",
+      "type": "integer"
+    },
+    "input_tokens": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Input Tokens",
+      "type": "integer"
+    },
+    "output_tokens": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Output Tokens",
+      "type": "integer"
+    },
+    "request_digest": {
+      "title": "Request Digest",
+      "type": "string"
+    }
+  },
+  "required": [
+    "provider",
+    "requested_model",
+    "resolved_model",
+    "choice",
+    "probabilities",
+    "request_digest"
+  ],
+  "title": "DecisionResult",
+  "type": "object"
+}

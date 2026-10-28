@@ -1,0 +1,8 @@
+{
+  "repository": "https://github.com/browser-use/jev-ultrafast",
+  "commit": "1231850a0bf1a0c0341fe408ef1668dbbfdfac46",
+  "files": {
+    "agent.py": "aaf8b271cb0ee6643fe7beb525328ab80de8568c7ac044d02b9c6721161e7c8b"
+  },
+  "adaptations": "agent.py byte-identical. Separate model/browser adapters use actual Azure provider and scoped CDP. The source Agent loop is unchanged."
+}

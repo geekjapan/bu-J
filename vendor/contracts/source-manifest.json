@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "retrieved_at": "2026-10-28T14:05:41.419184+00:00",
+  "sources": [
+    {
+      "url": "https://api.typesafe.ai/openapi.json",
+      "path": "vendor/contracts/typesafe-openapi.json",
+      "sha256": "3ca93b6e6b9aa8d7820531b78c66ed7a9798b11e6e163ad96b140fb3d75fbcf4",
+      "api_version": "0.2.0"
+    },
+    {
+      "url": "https://github.com/browser-use/browser-harness",
+      "commit": "4ced8e0087d2d45ea2d08c00cb62449b2d94a90e",
+      "runtime_compatibility": "NOT_VERIFIED"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/foundry/foundry-models/how-to/use-foundry-models-microsoft-decision",
+      "path": "vendor/contracts/microsoft-decision-1.json",
+      "sha256": "3788a49cec8d9b5a8433b3c22c693f3b21e6ba6a2fcbb03a3749f51c5db626c9",
+      "kind": "reviewed_contract_summary_not_openapi",
+      "runtime_compatibility": "ONE_SYNTHETIC_RESPONSE_VERIFIED_TASK_COMPLETION_NOT_VERIFIED"
+    }
+  ],
+  "model_availability": "NOT_VERIFIED",
+  "paid_inference": "AZURE_SYNTHETIC_RESPONSE_VERIFIED_TYPESAFE_NOT_RUN",
+  "providers": {
+    "typesafe": {
+      "model": "jev-1.14.0"
+    },
+    "azure": {
+      "model": "microsoft-decision-1",
+      "version": "1",
+      "deployment": "explicit configuration"
+    }
+  }
+}

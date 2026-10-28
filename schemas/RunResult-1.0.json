@@ -1,0 +1,77 @@
+{
+  "$defs": {
+    "Record": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "updated_at": {
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "updated_at"
+      ],
+      "title": "Record",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "SUCCEEDED",
+        "FAILED",
+        "CANCELLED",
+        "WAITING_APPROVAL",
+        "ESCALATED",
+        "UNKNOWN_EFFECT",
+        "OBSERVED"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "records": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Record"
+      },
+      "title": "Records",
+      "type": "array"
+    },
+    "steps": {
+      "default": 0,
+      "title": "Steps",
+      "type": "integer"
+    },
+    "model_calls": {
+      "default": 0,
+      "title": "Model Calls",
+      "type": "integer"
+    },
+    "reason": {
+      "default": "",
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id",
+    "state"
+  ],
+  "title": "RunResult",
+  "type": "object"
+}

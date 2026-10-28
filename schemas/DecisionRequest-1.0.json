@@ -1,0 +1,89 @@
+{
+  "$defs": {
+    "Candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "description"
+      ],
+      "title": "Candidate",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "goal": {
+      "title": "Goal",
+      "type": "string"
+    },
+    "phase": {
+      "title": "Phase",
+      "type": "string"
+    },
+    "page_kind": {
+      "title": "Page Kind",
+      "type": "string"
+    },
+    "page_index": {
+      "title": "Page Index",
+      "type": "integer"
+    },
+    "has_next": {
+      "title": "Has Next",
+      "type": "boolean"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/Candidate"
+      },
+      "title": "Candidates",
+      "type": "array"
+    },
+    "requested_model": {
+      "default": "mock-v1",
+      "title": "Requested Model",
+      "type": "string"
+    },
+    "question_version": {
+      "default": "next-action-v1",
+      "title": "Question Version",
+      "type": "string"
+    },
+    "request_digest": {
+      "default": "",
+      "title": "Request Digest",
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id",
+    "goal",
+    "phase",
+    "page_kind",
+    "page_index",
+    "has_next",
+    "candidates"
+  ],
+  "title": "DecisionRequest",
+  "type": "object"
+}

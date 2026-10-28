@@ -1,0 +1,31 @@
+{
+  "source_url": "https://learn.microsoft.com/en-us/azure/foundry/foundry-models/how-to/use-foundry-models-microsoft-decision",
+  "kind": "reviewed_contract_summary_not_openapi",
+  "reviewed_at": "2026-10-28",
+  "provider": "azure",
+  "model": "microsoft-decision-1",
+  "underlying_model_version": "1",
+  "path": "/providers/microsoft/v1/systemone",
+  "request_model": "configured_deployment_name",
+  "response_model": "underlying_model_name",
+  "authentication": [
+    "api-key header",
+    "Authorization Bearer Entra token"
+  ],
+  "request_fields": [
+    "model",
+    "state",
+    "questions"
+  ],
+  "question_types_used": [
+    "choice",
+    "noul"
+  ],
+  "response_fields": [
+    "model",
+    "answers",
+    "usage"
+  ],
+  "live_inference_verified": true,
+  "live_inference_scope": "Existing deployment, synthetic request, valid response; execution safely abstained below threshold. Not task completion."
+}

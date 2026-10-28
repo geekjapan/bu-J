@@ -1,0 +1,11 @@
+{
+  "source_url": "https://raw.githubusercontent.com/browser-use/browser-harness/main/src/mcp_server.py",
+  "sha256": "88be79452beb74bf1dd4294b4b50bfbf672c2cf76bd8bec738b9567d0716833e",
+  "harness_source_version": "0.1.13",
+  "mcp_sdk_version": "2.1.1",
+  "schema_fixture": "mcp-tools-reviewed.json",
+  "schema_method": "Pinned source function signatures registered with MCPServer from mcp==2.1.1. Browser helper imports and tool bodies were not executed. Descriptions omitted. Tool.model_dump uses inputSchema alias on the wire.",
+  "live_tools_list_verified": false,
+  "live_isolation_verified": false,
+  "live_egress_verified": false
+}
