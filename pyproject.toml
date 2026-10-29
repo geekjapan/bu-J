@@ -13,10 +13,12 @@ dependencies = ["pydantic>=2.12,<3", "httpx>=0.28,<1"]
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2"]
 web = ["websocket-client>=1.8,<2", "httpx[http2]>=0.28,<1"]
+generic = ["browser-use==0.13.14", "httpx[http2]>=0.28,<1", "jsonschema>=4.23,<5"]
 
 [project.scripts]
 decision-browser = "decision_browser.cli:main"
 decision-browser-web = "decision_browser.web.cli:main"
+decision-browser-general = "decision_browser.general.cli:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

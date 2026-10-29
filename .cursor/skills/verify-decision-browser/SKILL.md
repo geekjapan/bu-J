@@ -68,6 +68,9 @@ For the separate `decision-browser-web` entry point and the Flights, Wikipedia,
 and hotel comparison, use [the web journey](features/web.md). Its live calls are
 separate from the offline helper and legacy formal coverage.
 
+For `decision-browser-general`, use [the general browser journey](features/general.md).
+It verifies the new owned Chrome adapter. Its API planner acceptance is separate.
+
 ## Evidence
 
 Proof lives under `.audit/verification-skill/` in the UUID directory printed by

@@ -1,0 +1,12 @@
+{
+  "project": "browser-use",
+  "repository": "https://github.com/browser-use/browser-use",
+  "version": "0.13.14",
+  "commit": "2cc71890e65056b67fdb29d98bb407749c15bb08",
+  "license": "MIT",
+  "notice": "browser-use-LICENSE.txt",
+  "adapted_files": {
+    "session.py": ["browser_use/browser/session.py", "browser_use/browser/session_manager.py"]
+  },
+  "bounds": "DOM and session machinery reused; autonomous watchdogs, recovery and upstream action retries excluded. Mutation dispatch and journal belong to bu-J."
+}

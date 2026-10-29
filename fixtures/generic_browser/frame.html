@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>__FRAME_LABEL__ confirmation</title><link rel="stylesheet" href="/style.css"></head><body><main style="margin: 0; padding: 1rem"><form action="/action/__KIND__" method="post"><label for="contact">__FRAME_LABEL__ contact</label><input id="contact" name="name" required maxlength="200" data-testid="__KIND__-contact"><br><button data-testid="__KIND__-confirm">Confirm __FRAME_LABEL__ contact</button></form><output aria-live="polite" data-testid="__KIND__-result"></output></main><script>
+document.querySelector('form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const output = document.querySelector('output');
+  try {
+    const response = await fetch(event.currentTarget.action, {method: 'POST', body: new URLSearchParams(new FormData(event.currentTarget))});
+    const result = await response.json();
+    output.textContent = response.ok ? `Confirmed ${result.action} #${result.count}\n${JSON.stringify(result)}` : result.error;
+  } catch (error) { output.textContent = `Request failed: ${error.message}`; }
+});
+</script></body></html>

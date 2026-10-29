@@ -27,10 +27,13 @@ class CDPServer(socketserver.ThreadingTCPServer):
     daemon_threads = True
 
 
-def main():
+def main(*, generic=False):
     children = []
     server = None
     Path("/tmp/home").mkdir(exist_ok=True)
+    if generic:
+        for directory in ("/tmp/bu-j-downloads", "/tmp/bu-j-uploads"):
+            Path(directory).mkdir(exist_ok=True)
 
     def stop(signum, frame):
         raise SystemExit(128 + signum)
@@ -38,11 +41,13 @@ def main():
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     try:
-        children.append(subprocess.Popen([sys.executable, "/opt/web-benchmark/proxy.py"]))
-        children.append(subprocess.Popen([
+        children.append(subprocess.Popen([sys.executable,
+            "/opt/generic/proxy.py" if generic else "/opt/web-benchmark/proxy.py"]))
+        fixture = ([sys.executable, "/opt/generic/fixture_server.py"] if generic else [
             sys.executable, "-m", "http.server", "8766", "--bind", "127.0.0.1",
             "--directory", "/opt/fixture",
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+        ])
+        children.append(subprocess.Popen(fixture, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
         with open("/tmp/chrome.log", "w") as log:
             chrome = subprocess.Popen([
                 "google-chrome", "--headless=new", "--no-sandbox", "--disable-dev-shm-usage",
@@ -52,7 +57,8 @@ def main():
                 "--proxy-server=http://127.0.0.1:8888", "--proxy-bypass-list=<-loopback>",
                 "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=9222",
                 "--user-data-dir=/tmp/web-chrome-profile", "--window-size=1120,780",
-                "--lang=en-US", "--accept-lang=en-US", "about:blank",
+                "--lang=en-US", "--accept-lang=en-US",
+                *(["--disable-extensions"] if generic else []), "about:blank",
             ], stdout=subprocess.DEVNULL, stderr=log, env={**os.environ, "TZ": "UTC"})
             children.append(chrome)
         server = CDPServer(("0.0.0.0", 9223), CDPRelay)
@@ -68,6 +74,7 @@ def main():
                 Path("/tmp/ready.json").write_text(json.dumps({
                     "version": version, "cdp_port": 9223, "fixture_port": 8766,
                     "proxy_port": 8888, "chrome_no_sandbox": True,
+                    **({"mode": "generic"} if generic else {}),
                 }))
                 break
             except (OSError, ValueError):

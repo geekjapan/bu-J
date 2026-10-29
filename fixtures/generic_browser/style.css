@@ -1,0 +1,20 @@
+:root { color-scheme: light; font-family: system-ui, sans-serif; color: #203145; background: #f2f5f8; }
+body { margin: 0; line-height: 1.55; }
+header { background: #17334b; color: white; padding: 2rem max(1.5rem, calc((100% - 1000px)/2)); }
+header p { color: #c8dce8; margin-bottom: 0; }
+main { max-width: 1000px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+section, article { padding: 1.5rem; margin: 1.25rem 0; background: white; border: 1px solid #d9e2e9; border-radius: 12px; }
+h1, h2, h3 { line-height: 1.2; }
+h2 { margin-top: 0; }
+label { display: block; font-weight: 600; margin: 1rem 0 .3rem; }
+input, select, button, .button { font: inherit; padding: .65rem .85rem; border: 1px solid #8c9ead; border-radius: 6px; }
+input[type=text], select { min-width: 230px; max-width: 90%; }
+input[type=checkbox] { width: 1.15rem; height: 1.15rem; }
+button, .button { display: inline-block; background: #17685e; color: white; cursor: pointer; margin-top: 1rem; text-decoration: none; }
+button:hover, .button:hover { background: #104e46; }
+:focus-visible { outline: 3px solid #e7a321; outline-offset: 3px; }
+output { display: block; margin-top: 1rem; white-space: pre-wrap; overflow-wrap: anywhere; color: #154f44; }
+iframe { width: 100%; height: 340px; border: 1px solid #b9c8d4; border-radius: 8px; }
+.note { color: #526779; }
+.badge { font-size: .8rem; text-transform: uppercase; letter-spacing: .12em; }
+.scroll-space { min-height: 1100px; background: linear-gradient(#fff, #e9f2f0); display: flex; align-items: center; justify-content: center; color: #526779; }
