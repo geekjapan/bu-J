@@ -1,66 +1,130 @@
 from __future__ import annotations
 
-import base64
+import errno
 import hashlib
-import json
 import os
 from pathlib import Path
 import re
 import stat
-import subprocess
 from uuid import uuid4
 
 MAX_FILE = 10 * 1024 * 1024
 MAX_TOTAL = 40 * 1024 * 1024
 
 
-def stage_uploads(container, uploads):
+def _open_upload(filename):
+    if os.name != "nt":
+        return os.open(filename, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    import ctypes
+    from ctypes import wintypes
+    import msvcrt
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    create = kernel.CreateFileW
+    create.argtypes = (wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
+                       wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE)
+    create.restype = wintypes.HANDLE
+    close = kernel.CloseHandle
+    close.argtypes = (wintypes.HANDLE,)
+    close.restype = wintypes.BOOL
+    generic_read, share_read_write_delete = 0x80000000, 0x7
+    open_existing, open_reparse_point = 3, 0x00200000
+    handle = create(os.fspath(filename), generic_read, share_read_write_delete, None,
+                    open_existing, open_reparse_point, None)
+    if handle == ctypes.c_void_p(-1).value:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        return msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
+    except BaseException:
+        close(handle)
+        raise
+
+
+def _read_file(filename: Path) -> bytes:
+    descriptor = _open_upload(filename)
+    with os.fdopen(descriptor, "rb") as source:
+        info = os.fstat(source.fileno())
+        if os.name == "nt" and (not hasattr(info, "st_file_attributes") or
+                info.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT):
+            raise OSError(errno.ELOOP, "File reparse points are not allowed", filename)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_FILE:
+            raise ValueError("file must be a regular file at most 10 MiB")
+        data = source.read(MAX_FILE + 1)
+    if len(data) > MAX_FILE:
+        raise ValueError("file exceeds 10 MiB")
+    return data
+
+
+def _basename(name: str) -> str:
+    if (not isinstance(name, str) or not name or name in (".", "..")
+            or any(char in name for char in ("/", "\\", ":"))
+            or any(ord(char) < 32 or ord(char) == 127 for char in name)):
+        raise ValueError("file name must be a plain basename")
+    return name
+
+
+def stage_uploads(output: Path, uploads: dict) -> tuple[dict, dict]:
     staged, receipts = {}, {}
+    total = 0
     for token, filename in uploads.items():
-        descriptor = os.open(filename, os.O_RDONLY | os.O_NOFOLLOW)
-        with os.fdopen(descriptor, "rb") as source:
-            info = os.fstat(source.fileno())
-            if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_FILE:
-                raise ValueError("upload must be a regular file at most 10 MiB")
-            data = source.read(MAX_FILE + 1)
-        if len(data) > MAX_FILE:
-            raise ValueError("upload exceeds 10 MiB")
-        remote = "/tmp/bu-j-uploads/" + uuid4().hex + "/" + Path(filename).name
-        script = "import pathlib,sys; p=pathlib.Path(sys.argv[1]); p.parent.mkdir(); p.write_bytes(sys.stdin.buffer.read())"
-        subprocess.run(["docker", "exec", "-i", container, "python", "-c", script, remote],
-                       input=data, check=True, capture_output=True, timeout=30)
-        staged[token] = remote
-        receipts[token] = {"name": Path(filename).name, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
+        name = _basename(Path(filename).name)
+        data = _read_file(Path(filename))
+        total += len(data)
+        if total > MAX_TOTAL:
+            raise ValueError("upload budget exceeds 40 MiB")
+        destination = Path(output).absolute() / "uploads" / uuid4().hex / name
+        destination.parent.mkdir(parents=True, exist_ok=False)
+        with destination.open("xb") as target:
+            target.write(data)
+        staged[token] = str(destination)
+        receipts[token] = {"name": name, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
     return staged, receipts
 
 
-def collect_downloads(container, output):
-    script = '''import base64,json,pathlib,stat
-root=pathlib.Path('/tmp/bu-j-downloads')
-items=[]
-total=0
-for path in sorted(root.iterdir()):
-    info=path.lstat()
-    if not stat.S_ISREG(info.st_mode) or info.st_size>10485760:
-        raise ValueError('download must be a regular file at most 10 MiB')
-    total+=info.st_size
-    if total>41943040 or len(items)>=100:
-        raise ValueError('download budget exceeded')
-    items.append({'name':path.name,'data':base64.b64encode(path.read_bytes()).decode()})
-print(json.dumps(items))
-'''
-    result = subprocess.run(["docker", "exec", container, "python", "-c", script],
-                            check=True, capture_output=True, timeout=30)
+def collect_downloads(directory: Path | None, downloads: list[dict], output: Path) -> list[dict]:
     records = []
-    for item in json.loads(result.stdout):
-        name = item["name"]
-        if name.endswith(".crdownload"):
+    total = 0
+    if len(downloads) > 100:
+        raise ValueError("download budget exceeds 100 files")
+    for index, item in enumerate(downloads):
+        record = {**item, "copied": False}
+        records.append(record)
+        name = item.get("suggested_filename") or item.get("name")
+        if directory is None:
+            record["copy_reason"] = "No download directory supplied; metadata only"
             continue
-        data = base64.b64decode(item["data"], validate=True)
+        if item.get("state") != "completed" or not item.get("filePath"):
+            record["copy_reason"] = "Completed download metadata with an exact saved filePath required"
+            continue
+        saved = Path(item["filePath"])
+        root = Path(directory).absolute()
+        if not saved.is_absolute() or saved.parent != root or ".." in saved.parts:
+            raise ValueError("completed download filePath must be directly within the supplied directory")
+        saved_name = _basename(saved.name)
+        name = name or saved_name
+        if saved_name.lower().endswith((".crdownload", ".part", ".tmp")):
+            record["copy_reason"] = "Download file is pending"
+            continue
+        info = root.lstat()
+        if not stat.S_ISDIR(info.st_mode) or (os.name == "nt" and
+                info.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT):
+            raise ValueError("download directory must be a regular directory without symlinks")
+        try:
+            data = _read_file(saved)
+        except FileNotFoundError:
+            record["copy_reason"] = "Completed download file is not available in the supplied directory"
+            continue
+        total += len(data)
+        if total > MAX_TOTAL:
+            raise ValueError("download budget exceeds 40 MiB")
         digest = hashlib.sha256(data).hexdigest()
-        filename = name if re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,150}", name) else "download-" + digest + ".bin"
+        suffix = Path(saved_name).suffix
+        if not re.fullmatch(r"\.[a-zA-Z0-9]{1,12}", suffix):
+            suffix = ".bin"
+        filename = f"{index:03d}-{digest}{suffix}"
         folder = Path(output) / "downloads"
-        folder.mkdir(exist_ok=True)
-        (folder / filename).write_bytes(data)
-        records.append({"path": "downloads/" + filename, "name": name, "bytes": len(data), "sha256": digest})
+        folder.mkdir(parents=True, exist_ok=True)
+        with (folder / filename).open("xb") as destination:
+            destination.write(data)
+        record.update(path="downloads/" + filename, name=name, bytes=len(data), sha256=digest, copied=True)
     return records

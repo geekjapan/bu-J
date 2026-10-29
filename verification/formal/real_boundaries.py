@@ -104,7 +104,7 @@ async def worker(directory: Path, selected: str):
 
 
 def records(path: Path):
-    return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+    return [json.loads(line) for line in path.read_text(encoding='utf-8').splitlines()] if path.exists() else []
 
 
 def check(directory: Path, source: Path):
@@ -115,8 +115,8 @@ def check(directory: Path, source: Path):
         case.mkdir(parents=True)
         command = [sys.executable, str(Path(__file__).resolve()), "--worker", str(case)]
         for attempt, boundary in enumerate((selected, "none", "none")):
-            completed = subprocess.run([*command, "--boundary", boundary], env=env, capture_output=True, text=True, timeout=15)
-            (case / f"attempt-{attempt}.log").write_text(completed.stdout + completed.stderr)
+            completed = subprocess.run([*command, "--boundary", boundary], env=env, capture_output=True, text=True, timeout=15, encoding='utf-8')
+            (case / f"attempt-{attempt}.log").write_text(completed.stdout + completed.stderr, encoding='utf-8')
             expected = 75 if attempt == 0 and selected != "none" else 0
             if completed.returncode != expected:
                 raise AssertionError(f"{selected}: exit {completed.returncode}, expected {expected}; see {case}")
@@ -148,7 +148,7 @@ def main():
         asyncio.run(worker(args.worker, args.boundary))
     else:
         result = check(args.output, args.source)
-        (args.output / "summary.json").write_text(json.dumps(result, indent=2) + "\n")
+        (args.output / "summary.json").write_text(json.dumps(result, indent=2) + "\n", encoding='utf-8')
         print(json.dumps(result))
 
 

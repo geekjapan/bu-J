@@ -14,6 +14,7 @@ from decision_browser.controller import Controller
 from decision_browser.drivers.mock import MockBrowserDriver
 from decision_browser.providers.azure import AzureDecisionProvider, validate_endpoint
 from decision_browser.providers.mock import MockDecisionProvider
+from decision_browser._runtime import azure_cli_executable
 
 
 def azure_provider(args: argparse.Namespace) -> AzureDecisionProvider:
@@ -23,9 +24,9 @@ def azure_provider(args: argparse.Namespace) -> AzureDecisionProvider:
     if args.azure_auth == 'azure-cli':
         try:
             token = subprocess.run(
-                ['az', 'account', 'get-access-token', '--resource', 'https://cognitiveservices.azure.com/',
+                [azure_cli_executable(), 'account', 'get-access-token', '--resource', 'https://cognitiveservices.azure.com/',
                  '--query', 'accessToken', '--output', 'tsv'],
-                check=True, capture_output=True, text=True, timeout=10,
+                check=True, capture_output=True, text=True, encoding='utf-8', timeout=10,
             ).stdout.strip()
         except (OSError, subprocess.SubprocessError):
             raise ValueError('Azure CLI authentication failed') from None
@@ -46,6 +47,8 @@ async def run(args: argparse.Namespace, task: TaskSpec, journal: Journal):
 
 
 def main() -> int:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
     parser = argparse.ArgumentParser(description='Run synthetic fixture search with a mock or Azure decision provider')
     parser.add_argument('--query', default='')
     parser.add_argument('--mode', choices=('observe-only', 'shadow', 'enforced'), default='shadow')
@@ -70,7 +73,7 @@ def main() -> int:
             journal.export_events(args.audit_jsonl)
         output = result.model_dump_json(indent=2) + '\n'
         if args.output:
-            args.output.write_text(output)
+            args.output.write_text(output, encoding='utf-8')
         print(output, end='')
         return 0 if result.state in ('SUCCEEDED', 'OBSERVED') else 1
     except ValueError:

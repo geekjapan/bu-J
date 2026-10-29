@@ -13,6 +13,8 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from .._runtime import azure_cli_executable
+
 from .questions import NEXT_ACTION, TARGET, TEXT_VALUE
 from .progress import progress
 
@@ -82,9 +84,9 @@ def _endpoint(endpoint, *, text=False):
 def _azure_token():
     try:
         result = subprocess.run(
-            ['az', 'account', 'get-access-token', '--resource', 'https://cognitiveservices.azure.com/',
+            [azure_cli_executable(), 'account', 'get-access-token', '--resource', 'https://cognitiveservices.azure.com/',
              '--query', 'accessToken', '--output', 'tsv'],
-            capture_output=True, text=True, check=True, timeout=25)
+            capture_output=True, text=True, encoding='utf-8', check=True, timeout=25)
         return result.stdout.strip()
     except (OSError, subprocess.SubprocessError):
         raise ProviderError('Azure CLI token acquisition failed') from None

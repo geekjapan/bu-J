@@ -14,7 +14,7 @@ import websocket
 
 from .tasks import allowed_action, validate_url
 
-READ_STATE = (Path(__file__).with_name("upstream") / "snapshot.js").read_text()
+READ_STATE = (Path(__file__).with_name("upstream") / "snapshot.js").read_text(encoding='utf-8')
 MARKER = f"(() => {{ const state={READ_STATE}; return state?.marker ?? null; }})()"
 METADATA = """(() => {
   const result={};

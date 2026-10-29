@@ -14,19 +14,18 @@ using the existing Mock provider boundary and synthetic fixture Driver. Read the
 
 The application is a short-lived CLI; there is no server, port, login or shared
 browser session. Requires the project's existing Python >=3.12 environment:
-`.venv/bin/python` and `.venv/bin/decision-browser`. If absent, stop and report the
+`uv run --no-sync python` and the installed `decision-browser` console command. If absent, stop and report the
 missing prerequisite; the documented installation is
 `uv sync --locked --extra dev --python 3.12` (dependency installation is separate
 from this read-only doctor).
 
 ```sh
-RUN=$(.venv/bin/python .cursor/skills/verify-decision-browser/scripts/control.py launch)
-printf '%s\n' "$RUN"
+uv run --no-sync python .cursor/skills/verify-decision-browser/scripts/control.py launch
 ```
 
 Launch checks the actual console entry point's `--help`, records package versions
 and boundary source hashes, and creates an empty, unique temporary runtime.
-The printed absolute directory is the run's evidence handle. Save it before
+The printed absolute directory is the run's evidence handle. Replace `RUN_PATH` below with it. Save it before
 continuing. Ready means the installed CLI accepts the documented flags; a drive
 must still prove the user behavior. Every drive uses unique task IDs and explicit
 journal paths. No default repository journal or personal session is used.
@@ -34,7 +33,7 @@ journal paths. No default repository journal or personal session is used.
 ## Doctor
 
 ```sh
-.venv/bin/python .cursor/skills/verify-decision-browser/scripts/control.py doctor
+uv run --no-sync python .cursor/skills/verify-decision-browser/scripts/control.py doctor
 ```
 
 This read-only check reads Python/package versions and runs CLI `--help` only.
@@ -44,7 +43,7 @@ inference. A failed doctor stops the drive. It does not claim auth readiness.
 ## Drive
 
 ```sh
-.venv/bin/python .cursor/skills/verify-decision-browser/scripts/control.py drive --run "$RUN" --feature search
+uv run --no-sync python .cursor/skills/verify-decision-browser/scripts/control.py drive --run "RUN_PATH" --feature search
 ```
 
 Other mapped journeys use `--feature observe`, `--feature routing`, or
@@ -69,7 +68,7 @@ and hotel comparison, use [the web journey](features/web.md). Its live calls are
 separate from the offline helper and legacy formal coverage.
 
 For `decision-browser-general`, use [the general browser journey](features/general.md).
-It verifies the new owned Chrome adapter. Its API planner acceptance is separate.
+It covers attachment to the running browser, explicit existing-tab selection, local files, and retained tabs after disconnect. Its API planner acceptance is separate. Docker recipes are optional historical tests, not setup for this CLI.
 
 ## Evidence
 
@@ -95,7 +94,7 @@ this journey does not prove disagreement handling.
 Run after success or failure, retaining the printed run handle:
 
 ```sh
-.venv/bin/python .cursor/skills/verify-decision-browser/scripts/control.py cleanup --run "$RUN"
+uv run --no-sync python .cursor/skills/verify-decision-browser/scripts/control.py cleanup --run "RUN_PATH"
 ```
 
 Cleanup verifies the unique runtime's ownership marker, removes only that scratch
@@ -107,7 +106,7 @@ evidence as part of teardown.
 ## Helpers
 
 The executable helper is `scripts/control.py`; invoke with the repository's
-`.venv/bin/python` as shown above. It uses standard-library subprocess and SQLite,
+`uv run --no-sync python` as shown above. It uses standard-library subprocess and SQLite,
 plus installed package metadata. No product code, dependency configuration,
 credentials or external resources are modified. Assertion failure means failure,
 not a skipped success; inspect its retained command and SQLite artifacts.

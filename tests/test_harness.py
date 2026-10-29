@@ -1,6 +1,5 @@
 import importlib.util
 import json
-import os
 import sys
 import threading
 import time
@@ -24,7 +23,7 @@ def settings(tmp_path):
 
 def test_schema_diff_rejected():
     schema_path = Path(__file__).resolve().parents[1] / "fixtures/webapp/mcp-tools-reviewed.json"
-    validate_tools(json.loads(schema_path.read_text()))
+    validate_tools(json.loads(schema_path.read_text(encoding='utf-8')))
     validate_tools(reviewed_tools())
     for mutate in (
         lambda r: r["tools"].append({"name": "new_tool", "inputSchema": {}}),
@@ -38,7 +37,7 @@ def test_schema_diff_rejected():
             validate_tools(result)
 
 
-async def test_stdio_persistent_schema_and_error_channels(tmp_path):
+async def test_stdio_persistent_schema_and_error_channels(tmp_path, settings):
     script = tmp_path / "fake_mcp.py"
     script.write_text('''import json, sys
 from decision_browser.drivers.harness_mcp import reviewed_tools
@@ -53,8 +52,8 @@ for line in sys.stdin:
  elif r["params"]["arguments"].get("mode")=="badjson": out={"content":[{"type":"text","text":"not JSON"}]}
  else: out={"content":[{"type":"text","text":json.dumps({"targetId":"fixture"})}]}
  print(json.dumps({"jsonrpc":"2.0","id":r["id"],"result":out}),flush=True)
-''')
-    env = {"PATH": os.defpath, "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")}
+''', encoding='utf-8')
+    env = {**settings.environment(), "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")}
     transport = MCPStdioTransport((sys.executable, str(script)), env=env)
     try:
         await transport.start()
@@ -144,10 +143,10 @@ def test_loopback_fixture_variants_and_pagination():
         thread.join()
 
 
-async def test_stdio_timeout_closes_connection(tmp_path):
+async def test_stdio_timeout_closes_connection(tmp_path, settings):
     script = tmp_path / "silent.py"
-    script.write_text("import time; time.sleep(60)")
-    transport = MCPStdioTransport((sys.executable, str(script)), env={"PATH": os.defpath}, timeout=0.05)
+    script.write_text("import time; time.sleep(60)", encoding="utf-8")
+    transport = MCPStdioTransport((sys.executable, str(script)), env=settings.environment(), timeout=0.05)
     with pytest.raises(TimeoutError):
         await transport.start()
     assert not transport.ready

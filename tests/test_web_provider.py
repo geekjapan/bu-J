@@ -4,7 +4,7 @@ import subprocess
 import httpx
 import pytest
 
-from decision_browser.web.provider import ModelClient, ProviderError, _azure_token, field_context
+from decision_browser.web.provider import ModelClient, ProviderError, _azure_token, azure_cli_executable, field_context
 
 ENDPOINT = 'https://benchmark.cognitiveservices.azure.com'
 TOKEN = 'offline-secret-token'
@@ -213,9 +213,9 @@ def test_azure_cli_exact_command_and_no_saved_credential(monkeypatch):
         return subprocess.CompletedProcess(argv, 0, TOKEN + '\n', '')
     monkeypatch.setattr(subprocess, 'run', run)
     assert _azure_token() == TOKEN
-    assert commands[0][0] == ['az', 'account', 'get-access-token', '--resource',
+    assert commands[0][0] == [azure_cli_executable(), 'account', 'get-access-token', '--resource',
                               'https://cognitiveservices.azure.com/', '--query', 'accessToken', '--output', 'tsv']
-    assert commands[0][1] == {'capture_output': True, 'text': True, 'check': True, 'timeout': 25}
+    assert commands[0][1] == {'capture_output': True, 'text': True, 'encoding': 'utf-8', 'check': True, 'timeout': 25}
 
 @pytest.mark.parametrize('choose_none', [False, True])
 def test_singleton_target_is_a_real_choice_with_safe_abstention(choose_none):

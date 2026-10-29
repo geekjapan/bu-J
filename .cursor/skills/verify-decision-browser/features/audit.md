@@ -20,7 +20,7 @@ Users retain an authoritative SQLite journal, export ordered JSONL events, and a
 
 Preconditions: fresh Launch and passing Doctor with the saved `RUN`; all failures target only run-owned scratch paths.
 
-- **Export and stored observations.** Run `.venv/bin/python .cursor/skills/verify-decision-browser/scripts/control.py drive --run "$RUN" --feature audit`. `audit-success` searches `a` and records four matching records and four VERIFIED operations; exported event types/payloads equal SQLite order. Observation snapshots use `persisted-redacted-v1` and redacted nonempty query and record names.
+- **Export and stored observations.** Run `uv run --no-sync python .cursor/skills/verify-decision-browser/scripts/control.py drive --run "RUN_PATH" --feature audit`. `audit-success` searches `a` and records four matching records and four VERIFIED operations; exported event types/payloads equal SQLite order. Observation snapshots use `persisted-redacted-v1` and redacted nonempty query and record names.
 - **Replay.** The helper resubmits the same task and journal. `replay/command.json` shows exit 1, `FAILED`, `AUDIT_OR_JOURNAL_PERSISTENCE_FAILED`; independent SQLite reads show exactly the original four operations unchanged.
 - **Export failure.** `export-failure/command.json` shows exit 1 and `SQLite journal remains authoritative`; no result JSON is written. Its retained SQLite backup still ends in `task_succeeded` and six VERIFIED operations.
 - **Output failure.** `output-failure/command.json` shows the same exit and warning, while its earlier JSONL export survives and completed operations remain in SQLite.

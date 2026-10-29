@@ -27,7 +27,7 @@ def digest(path):
 
 
 def hashes():
-    record = json.loads(COVERAGE.read_text())
+    record = json.loads(COVERAGE.read_text(encoding='utf-8'))
     return {name: digest(ROOT / name) for name in record["source_sha256"]}
 
 
@@ -44,14 +44,14 @@ def verified_commit(root, source_hashes):
 
 def command(arguments, output, cwd=ROOT, expected=0, marker=None):
     try:
-        completed = subprocess.run(arguments, cwd=cwd, text=True, capture_output=True, timeout=120)
+        completed = subprocess.run(arguments, cwd=cwd, text=True, capture_output=True, timeout=120, encoding='utf-8')
     except subprocess.TimeoutExpired as error:
         partial = error.stdout or b""
         if isinstance(partial, bytes):
             partial = partial.decode(errors="replace")
-        output.write_text("COMMAND " + json.dumps([str(a) for a in arguments]) + "\n" + partial + "\nTIMEOUT after 120 seconds\n")
+        output.write_text("COMMAND " + json.dumps([str(a) for a in arguments]) + "\n" + partial + "\nTIMEOUT after 120 seconds\n", encoding='utf-8')
         raise RuntimeError(f"command timed out; inspect {output}") from error
-    output.write_text("COMMAND " + json.dumps([str(a) for a in arguments]) + "\n" + completed.stdout + completed.stderr)
+    output.write_text("COMMAND " + json.dumps([str(a) for a in arguments]) + "\n" + completed.stdout + completed.stderr, encoding='utf-8')
     if completed.returncode != expected or (marker and marker not in completed.stdout + completed.stderr):
         raise RuntimeError(f"unexpected result ({completed.returncode}); inspect {output}")
     return completed.stdout + completed.stderr
@@ -61,14 +61,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--record-sync", action="store_true", help="after reviewing model/source correspondence, record current source hashes and real HEAD")
     args = parser.parse_args()
-    record = json.loads(COVERAGE.read_text())
+    record = json.loads(COVERAGE.read_text(encoding='utf-8'))
     current = hashes()
     if args.record_sync:
         commit = verified_commit(ROOT, current)
         record.update(sync_commit=commit, source_sha256=current,
                       sync_note="Covered source matches this commit." if commit else
                       "Working-tree source hashes only; HEAD is absent or does not match all covered files.")
-        COVERAGE.write_text(json.dumps(record, indent=2) + "\n")
+        COVERAGE.write_text(json.dumps(record, indent=2) + "\n", encoding='utf-8')
         print("Recorded source sync; this does not establish model correctness. Run verification next.")
         return
     if current != record["source_sha256"]:
@@ -109,7 +109,7 @@ def main():
                 raise RuntimeError("baseline TLC search was incomplete")
         real = [sys.executable, str(HERE / "real_boundaries.py")]
         command([*real, "--source", str(ROOT), "--output", str(run / "baseline")], run / "baseline.log")
-        summary["real_boundaries"] = json.loads((run / "baseline/summary.json").read_text())
+        summary["real_boundaries"] = json.loads((run / "baseline/summary.json").read_text(encoding='utf-8'))
         mutations = (
             ("remove-dispatch", "src/decision_browser/executor.py", '        self.journal.transition(key, "DISPATCHED")\n', '', "DurableDispatchBeforeSend"),
             ("replace-unique-operation", "src/decision_browser/audit.py", '"INSERT INTO operations VALUES(?,?,?,?,?,?)"', '"INSERT OR REPLACE INTO operations VALUES(?,?,?,?,?,?)"', "NoDuplicateSend"),
@@ -119,11 +119,11 @@ def main():
                 scratch = Path(scratch)
                 shutil.copytree(ROOT / "src", scratch / "src", ignore=shutil.ignore_patterns("__pycache__"))
                 target = scratch / file
-                original = target.read_text()
+                original = target.read_text(encoding='utf-8')
                 if original.count(old) != 1:
                     raise RuntimeError(f"mutation no longer applies exactly once: {name}")
-                target.write_text(original.replace(old, new))
-                (run / f"{name}-mutation.json").write_text(json.dumps({"file": file, "old": old, "new": new}, indent=2) + "\n")
+                target.write_text(original.replace(old, new), encoding='utf-8')
+                (run / f"{name}-mutation.json").write_text(json.dumps({"file": file, "old": old, "new": new}, indent=2) + "\n", encoding='utf-8')
                 command([*real, "--source", str(scratch), "--output", str(run / name)], run / f"{name}.log", expected=1, marker=f"AssertionError: {invariant}:")
                 summary[name] = {"rejected_by_behavior": invariant, "scratch_removed": True}
         command([*real, "--source", str(ROOT), "--output", str(run / "restored-baseline")], run / "restored-baseline.log")
@@ -134,7 +134,7 @@ def main():
         summary.update(status="FAIL", error=str(error))
         raise
     finally:
-        (run / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+        (run / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding='utf-8')
     print(json.dumps(summary, indent=2))
 
 

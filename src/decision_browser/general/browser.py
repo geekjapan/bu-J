@@ -60,15 +60,16 @@ _KEY_CODES = {
 
 
 class GeneralBrowser:
-    def __init__(self, endpoint: str, task: Task, uploads: dict[str, str]):
+    def __init__(self, endpoint: str, task: Task, uploads: dict[str, str], *, tab_id: str | None = None):
         parsed = urlsplit(endpoint)
         if parsed.scheme not in ('http', 'https', 'ws', 'wss') or not parsed.hostname or parsed.username or parsed.password:
-            raise ValueError('Explicit owned CDP endpoint required')
+            raise ValueError('Explicit existing browser CDP endpoint required')
         self.endpoint, self.task, self.uploads = endpoint, task, uploads
         self.session: Any = None
         self.observation: Any = None
-        self._captures: dict[str, tuple[dict, dict, str]] = {}
-        self._owned_tabs: set[str] = set()
+        self._captures: dict[str, tuple[dict, dict, str | None]] = {}
+        self.tab_id = tab_id
+        self.created_tab_id: str | None = None
         self._started_navigation = False
 
     async def start(self):
@@ -80,11 +81,11 @@ class GeneralBrowser:
 
         self.session = make_session(
             cdp_url=self.endpoint, keep_alive=True, enable_default_extensions=False,
-            auto_download_pdfs=False, downloads_path='/tmp/bu-j-downloads',
+            auto_download_pdfs=False, target_id=self.tab_id, no_viewport=True,
+            highlight_elements=False, dom_highlight_elements=False,
             allowed_domains=self.task.allowed_origins, cross_origin_iframes=True,
         )
         await self.session.start()
-        self._owned_tabs = {str(t.target_id) for t in await self.session.get_tabs()}
 
     async def close(self):
         if self.session is not None:
@@ -135,6 +136,17 @@ class GeneralBrowser:
                 await asyncio.sleep(.1)
 
     async def _observe(self) -> dict:
+        if self.session.agent_focus_target_id is None:
+            view = {
+                'url': 'about:blank', 'title': '', 'tabs': [], 'dom': '', 'text': '',
+                'nodes': {}, 'target_id': None, 'dom_truncated': False,
+                'dom_characters': 0, 'dom_sha256': hashlib.sha256(b'').hexdigest(),
+                'nodes_truncated': False, 'nodes_total': 0,
+            }
+            fingerprint = hashlib.sha256(json.dumps(view, sort_keys=True).encode()).hexdigest()
+            view['fingerprint'] = fingerprint
+            self._captures[fingerprint] = (copy.deepcopy(view), {}, None)
+            return view
         initial_blank = await self._initial_blank()
         await self._frames(initial_blank)
         raw = await self.session.get_browser_state_summary(include_screenshot=False, cached=False)
@@ -146,19 +158,20 @@ class GeneralBrowser:
             raise NotDispatched(raw.state_error)
         tabs = []
         for tab in raw.tabs:
-            self._check_url(tab.url, initial_blank)
             tab_id = str(tab.target_id)
-            self._owned_tabs.add(tab_id)
+            if tab_id not in self.session.task_target_ids:
+                continue
+            self._check_url(tab.url, initial_blank)
             tabs.append({'tab_id': tab_id, 'url': tab.url, 'title': tab.title})
         nodes, captured = {}, {}
         for index, node in list(raw.dom_state.selector_map.items())[:2000]:
-            if node.attributes.get('type', '').lower() == 'password':
-                raise NotDispatched('Password and login pages require a separate credential workflow')
             identity = {
                 'backend_node_id': node.backend_node_id, 'session_id': str(node.session_id),
                 'frame_id': node.frame_id, 'target_id': str(node.target_id),
                 'tag': node.node_name.lower(), 'attrs': dict(node.attributes),
             }
+            if identity['attrs'].get('type', '').lower() == 'password':
+                identity['attrs'].pop('value', None)
             nodes[str(index)] = identity
             captured[index] = copy.copy(node)
             captured[index].attributes = dict(node.attributes)
@@ -210,6 +223,8 @@ class GeneralBrowser:
         }
 
     async def screenshot(self) -> str:
+        if self.session.agent_focus_target_id is None:
+            raise NotDispatched('Navigate before taking a screenshot')
         await self._frames(await self._initial_blank())
         return base64.b64encode(await self.session.take_screenshot()).decode('ascii')
 
@@ -290,11 +305,16 @@ class GeneralBrowser:
         if capture is None or capture[0] != observed:
             raise NotDispatched('Unknown observation')
         _, captured, target_id = capture
-        if str(self.session.agent_focus_target_id) != target_id:
+        focus = self.session.agent_focus_target_id
+        if (str(focus) if focus is not None else None) != target_id:
             raise NotDispatched('Observed tab is no longer focused')
-        await self._frames(await self._initial_blank())
         kind = action.kind
-        cdp = await self.session.get_or_create_cdp_session(target_id, focus=False)
+        if target_id is None and kind != 'navigate':
+            raise NotDispatched('Navigate before acting on a tab')
+        if target_id is not None:
+            await self._frames(await self._initial_blank())
+        cdp = None if target_id is None else await self.session.get_or_create_cdp_session(target_id, focus=False)
+        created_tab_id = None
         index = getattr(action, 'index', None)
         object_id = guard = None
         if index is not None:
@@ -305,15 +325,17 @@ class GeneralBrowser:
             except ValueError as exc:
                 raise NotDispatched(str(exc)) from exc
             self._started_navigation = True
-            if action.new_tab:
-                result = await self._send(cdp, 'Target', 'createTarget', {'url': action.url})
-                target = result['targetId']
-                self._owned_tabs.add(str(target))
-                self.session.agent_focus_target_id = target
-            else:
-                result = await self._send(cdp, 'Page', 'navigate', {'url': action.url})
-                if result.get('errorText'):
-                    raise RuntimeError(result['errorText'])
+            if target_id is None or action.new_tab:
+                root = await self.session.get_root_cdp_session()
+                self._captures.pop(observed['fingerprint'])
+                result = await self._send(root, 'Target', 'createTarget', {'url': 'about:blank', 'background': True})
+                created_tab_id = self.created_tab_id = str(result['targetId'])
+                await self.session.attach_task_target(created_tab_id, created=True)
+                self.session.agent_focus_target_id = created_tab_id
+                cdp = await self.session.get_or_create_cdp_session(created_tab_id, focus=False)
+            result = await self._send(cdp, 'Page', 'navigate', {'url': action.url})
+            if result.get('errorText'):
+                raise RuntimeError(result['errorText'])
         elif kind == 'click':
             await self._send(cdp, 'DOM', 'scrollIntoViewIfNeeded', {'backendNodeId': captured[index].backend_node_id})
             cdp, object_id, guard = await self._node(index, captured)
@@ -341,7 +363,7 @@ class GeneralBrowser:
             await self._call(cdp, object_id, _SELECT, (action.value,))
         elif kind == 'upload':
             path = self.uploads.get(action.file)
-            if not path or not path.startswith('/tmp/bu-j-uploads/') or '..' in path.split('/'):
+            if not path:
                 raise NotDispatched('Upload not in staged task files')
             if guard['tag'] != 'input' or guard['attrs'].get('type', '').lower() != 'file':
                 raise NotDispatched('Node is not a file input')
@@ -363,6 +385,8 @@ class GeneralBrowser:
                     self.task.check_url(active['form_url'])
             except ValueError as exc:
                 raise NotDispatched('Focused frame outside task scope') from exc
+            if active['attrs'].get('type', '').lower() == 'password':
+                raise NotDispatched('Password input requires a separate credential workflow')
             if active['tag'] in ('iframe', 'frame') or not active['connected']:
                 raise NotDispatched('Focused frame cannot be safely targeted')
             if active['attrs'].get('href'):
@@ -382,6 +406,11 @@ class GeneralBrowser:
         elif kind == 'scroll':
             if guard and (not guard['visible'] or not guard['hit']):
                 raise NotDispatched('Scroll target is not hit-testable')
+            await self._send(cdp, 'Page', 'bringToFront')
+            if guard:
+                cdp, object_id, guard = await self._node(index, captured)
+                if not guard['visible'] or not guard['hit']:
+                    raise NotDispatched('Scroll target is not hit-testable')
             x, y = await self._point(cdp, captured[index], object_id) if guard else (1, 1)
             await self._send(cdp, 'Input', 'dispatchMouseEvent', {
                 'type': 'mouseWheel', 'x': x,
@@ -389,14 +418,15 @@ class GeneralBrowser:
             })
         elif kind in ('switch_tab', 'close_tab'):
             tabs = {t['tab_id']: t for t in observed['tabs']}
-            if action.tab_id not in tabs or action.tab_id not in self._owned_tabs:
-                raise NotDispatched('Tab not in owned observation')
+            if action.tab_id not in tabs or action.tab_id not in self.session.task_target_ids:
+                raise NotDispatched('Tab not in scoped observation')
+            if kind == 'close_tab' and action.tab_id not in self.session.created_target_ids:
+                raise NotDispatched('Borrowed tabs cannot be closed')
             method = 'activateTarget' if kind == 'switch_tab' else 'closeTarget'
             await self._send(cdp, 'Target', method, {'targetId': action.tab_id})
             if kind == 'switch_tab':
                 self.session.agent_focus_target_id = action.tab_id
             else:
-                self._owned_tabs.discard(action.tab_id)
                 remaining = [t for t in tabs if t != action.tab_id]
                 self.session.agent_focus_target_id = remaining[0] if remaining else None
         elif kind in ('back', 'forward'):
@@ -416,4 +446,7 @@ class GeneralBrowser:
             await asyncio.sleep(action.seconds)
         else:
             raise NotDispatched('Action belongs to runtime')
-        return {'kind': kind, 'returned': True}
+        receipt = {'kind': kind, 'returned': True}
+        if created_tab_id is not None:
+            receipt.update(created_tab_id=created_tab_id, user_browser_kept_alive=True)
+        return receipt

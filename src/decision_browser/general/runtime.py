@@ -58,8 +58,9 @@ async def run(task, task_id, browser, model, journal, output: Path):
     try:
         await asyncio.wait_for(browser.start(), min(30, remaining()))
         from .models import Navigate
-        initial = await observe()
-        await dispatch(0, Navigate(kind="navigate", url=task.url), initial)
+        if browser.tab_id is None:
+            initial = await observe()
+            await dispatch(0, Navigate(kind="navigate", url=task.url), initial)
         for step in range(1, task.max_steps + 1):
             page = await observe()
             image = await screenshot(step)

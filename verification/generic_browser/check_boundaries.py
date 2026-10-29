@@ -26,7 +26,7 @@ FORBIDDEN = "http://localhost:8766/boundary-target"
 def state(container):
     script = "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8766/state', timeout=5).read().decode())"
     result = subprocess.run(["docker", "exec", container, "python", "-c", script],
-                            capture_output=True, text=True, check=True, timeout=10)
+                            capture_output=True, text=True, check=True, timeout=10, encoding='utf-8')
     return json.loads(result.stdout)
 
 
@@ -169,7 +169,7 @@ def main(argv=None):
             case_output.mkdir()
             with ManagedChrome(case_output / "chrome", generic=True) as managed:
                 result = asyncio.run(check(managed.manifest, case_output, case))
-            cleanup = json.loads((case_output / "chrome" / "cleanup.json").read_text())
+            cleanup = json.loads((case_output / "chrome" / "cleanup.json").read_text(encoding='utf-8'))
             proof["cases"][case] = {"passed": result["passed"], "cleanup": cleanup,
                                     "proof": str(case_output / "proof.json")}
             assert cleanup["absent"], cleanup

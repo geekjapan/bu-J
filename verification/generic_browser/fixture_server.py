@@ -71,7 +71,7 @@ def make_server(root: str | Path = "/opt/generic/fixture", port: int = 8766) -> 
                 self.respond(404, {"error": "Unknown sandbox route"})
                 return
             try:
-                body = (root / pages[path]).read_text()
+                body = (root / pages[path]).read_text(encoding='utf-8')
             except OSError:
                 self.respond(500, {"error": "Sandbox files unavailable"})
                 return

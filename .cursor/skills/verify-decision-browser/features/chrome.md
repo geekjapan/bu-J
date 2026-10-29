@@ -5,7 +5,7 @@ Read [the runner instructions](../../../../verification/chrome/README.md)
 before running from the repository root:
 
 ```sh
-.venv/bin/python verification/chrome/run.py
+uv run --no-sync python verification/chrome/run.py
 ```
 
 Requires the existing Python environment and local Docker daemon. Building downloads

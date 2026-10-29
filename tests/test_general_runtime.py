@@ -19,6 +19,8 @@ def page(fingerprint='stable', *, url=URL, text='Form ready'):
 
 
 class Browser:
+    tab_id = None
+
     def __init__(self, observations=None, *, on_execute=None):
         self.observations = list(observations or [page()])
         self.executed = []
@@ -193,7 +195,7 @@ def test_existing_output_directory_remains_untouched(tmp_path, monkeypatch, caps
         pytest.fail('preexisting output must be rejected before browser execution')
 
     monkeypatch.setattr('decision_browser.general.cli.execute', forbidden)
-    assert main(['--task', str(task_file), '--output', str(output), '--launch']) == 1
+    assert main(['--task', str(task_file), '--output', str(output)]) == 1
     assert json.loads(capsys.readouterr().out)['status'] == 'FAILED'
     assert {path.name: path.read_bytes() for path in output.iterdir()} == before
 
@@ -218,3 +220,68 @@ async def test_schema_requires_real_extraction_before_done(tmp_path, journal):
     result = await run(task, 'structured', Browser(), Model({'kind': 'done', 'answer': 'Done'}), journal, tmp_path)
     assert result['status'] == 'ACCEPTANCE_FAILED'
     assert result['completion']['verified'] is False
+
+
+async def test_selected_tab_is_observed_without_initial_navigation(tmp_path, journal):
+    browser = Browser([page(text='Unsaved form contents')])
+    browser.tab_id = 'existing-user-tab'
+    result = await run(Task(url=URL, goal='Read current form', acceptance={'text': 'Unsaved form contents'}),
+                       'borrowed', browser, Model({'kind': 'done', 'answer': 'Read'}), journal, tmp_path)
+    assert result['status'] == 'VERIFIED'
+    assert browser.executed == []
+    assert journal.db.execute('SELECT COUNT(*) FROM general_operations').fetchone() == (0,)
+
+
+def test_tab_inventory_needs_no_task_model_or_docker(monkeypatch, capsys):
+    monkeypatch.setattr('decision_browser.general.cli.resolve_endpoint', lambda value: 'ws://localhost:9222/devtools/browser/test')
+    async def inventory(endpoint):
+        return [{'id': 'selected', 'url': URL, 'title': '既存フォーム'}]
+    monkeypatch.setattr('decision_browser.general.cli.list_tabs', inventory)
+    assert main(['--list-tabs']) == 0
+    emitted = capsys.readouterr().out
+    assert emitted.isascii()
+    assert json.loads(emitted) == [{'id': 'selected', 'url': URL, 'title': '既存フォーム'}]
+
+
+def test_normal_cli_uses_existing_browser_without_external_launcher(tmp_path, monkeypatch, capsys):
+    from types import SimpleNamespace
+    import subprocess
+
+    task_file = tmp_path / 'task.json'
+    task_file.write_text(json.dumps({'url': URL, 'goal': 'Read form'}), encoding='utf-8')
+    output = tmp_path / 'output'
+    instances = []
+
+    class ExistingBrowser(Browser):
+        def __init__(self, endpoint, task, uploads, *, tab_id=None):
+            super().__init__()
+            self.tab_id = tab_id
+            self.session = SimpleNamespace(downloads=[])
+            self.closed = False
+            instances.append(self)
+
+        async def close(self):
+            self.closed = True
+
+    class OfflineModel(Model):
+        def __init__(self, *args, **kwargs):
+            super().__init__({'kind': 'done', 'answer': 'Read form'})
+            self.calls, self.text_calls, self.total_tokens = [], [], 0
+
+        def authenticate(self):
+            pass
+
+        def close(self):
+            pass
+
+    def no_launcher(*args, **kwargs):
+        pytest.fail('normal CLI must not launch Docker or another browser process')
+
+    monkeypatch.setattr(subprocess, 'run', no_launcher)
+    monkeypatch.setattr('decision_browser.general.cli.resolve_endpoint', lambda value: 'ws://localhost:9222/devtools/browser/test')
+    monkeypatch.setattr('decision_browser.general.browser.GeneralBrowser', ExistingBrowser)
+    monkeypatch.setattr('decision_browser.general.cli.GeneralModelClient', OfflineModel)
+    assert main(['--task', str(task_file), '--output', str(output), '--tab-id', 'existing']) == 0
+    assert json.loads(capsys.readouterr().out)['status'] == 'REPORTED'
+    assert instances[0].closed and instances[0].executed == []
+    assert json.loads((output / 'result.json').read_text())['downloads'] == []

@@ -27,11 +27,11 @@ def main():
                 after=browser.observe()
                 verified=browser.fresh(after) and WebAgent.effect_verified(action,page,after,value)
                 receipts.append({'action':action,'effect_verified':verified})
-                (output/'actions.json').write_text(json.dumps(receipts,indent=2,ensure_ascii=False)+'\n')
+                (output/'actions.json').write_text(json.dumps(receipts,indent=2,ensure_ascii=False)+'\n', encoding='utf-8')
                 assert verified,label
                 page=after
             final=verify_task(task,browser.observe())
-            (output/'final.json').write_text(json.dumps({'verification':final,'page':page},indent=2,ensure_ascii=False)+'\n')
+            (output/'final.json').write_text(json.dumps({'verification':final,'page':page},indent=2,ensure_ascii=False)+'\n', encoding='utf-8')
             (output/'final.png').write_bytes(browser.screenshot())
             assert final['passed']
             print(json.dumps({'verified':True,'actions':len(receipts)}),flush=True)

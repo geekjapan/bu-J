@@ -3,17 +3,23 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import tempfile
 
 
 def main():
     root = Path(__file__).resolve().parents[1]
-    manifest = json.loads((root / 'vendor/contracts/source-manifest.json').read_text())
+    manifest = json.loads((root / 'vendor/contracts/source-manifest.json').read_text(encoding='utf-8'))
     for source in manifest['sources']:
         if 'path' in source:
             assert hashlib.sha256((root / source['path']).read_bytes()).hexdigest() == source['sha256'], source['path']
     subprocess.run([sys.executable, '-m', 'pytest', '-q'], cwd=root, check=True)
+    for name in ('decision-browser', 'decision-browser-web', 'decision-browser-general'):
+        executable = shutil.which(name)
+        assert executable, f'Missing installed CLI: {name}'
+        subprocess.run([executable, '--help'], cwd=root, check=True, capture_output=True,
+                       text=True, encoding='utf-8', timeout=15)
     with tempfile.TemporaryDirectory() as directory:
         folder = Path(directory)
         for mode in ('shadow', 'enforced', 'observe-only'):
@@ -21,8 +27,8 @@ def main():
                 output = folder / f'{mode}-{routing}.json'
                 process = subprocess.run([sys.executable, '-m', 'decision_browser', '--mode', mode,
                     '--routing', routing, '--journal', str(folder / f'{mode}-{routing}.sqlite3'),
-                    '--output', str(output)], cwd=root, check=True, capture_output=True, text=True)
-                result = json.loads(output.read_text())
+                    '--output', str(output)], cwd=root, check=True, capture_output=True, text=True, encoding='utf-8')
+                result = json.loads(output.read_text(encoding='utf-8'))
                 assert result == json.loads(process.stdout)
                 assert result['state'] == ('OBSERVED' if mode == 'observe-only' else 'SUCCEEDED'), result
                 if mode != 'observe-only':

@@ -60,7 +60,7 @@ def main(argv=None):
                     resource.close()
                 except Exception as error:
                     result.update(status="FAILED", reason="CLEANUP_FAILED", exception_type=type(error).__name__)
-        output.write_text(json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False) + "\n")
+        output.write_text(json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding='utf-8')
     success = result["status"] == "SUCCEEDED" and result.get("independent_verification", {}).get("passed") is True
     print(json.dumps({"status": result["status"], "verified": success, "output": str(output)}))
     return 0 if success else 1
