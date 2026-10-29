@@ -157,6 +157,11 @@ async def drive(endpoint, output):
         await act("select", "department", value="Operations")
         await act("click", "priority")
         await act("key", "requester-name", key="Enter")
+        cdp = await browser.session.get_or_create_cdp_session(focus=False)
+        before_scroll = (await browser._send(cdp, "Page", "getLayoutMetrics"))["cssLayoutViewport"]["pageY"]
+        await act("scroll", dy=550)
+        after_scroll = (await browser._send(cdp, "Page", "getLayoutMetrics"))["cssLayoutViewport"]["pageY"]
+        assert after_scroll > before_scroll, (before_scroll, after_scroll)
         for frame in ("same_frame", "cross_frame"):
             await act("input", frame + "-contact", text=frame + " Windows")
             await act("click", frame + "-confirm")
@@ -188,6 +193,7 @@ async def drive(endpoint, output):
         (output / "final.png").write_bytes(image)
         journal.finish(task_id, "VERIFIED")
         return {"steps": steps, "before": before, "after": after,
+                "scroll": {"before": before_scroll, "after": after_scroll},
                 "screenshot_sha256": hashlib.sha256(image).hexdigest()}
     finally:
         try:
