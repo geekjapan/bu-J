@@ -1,0 +1,28 @@
+{
+  "url": "https://www.iana.org/help/example-domains",
+  "goal": "Extract the page title and the main heading. Return the title and heading as structured data, then report the result.",
+  "allowed_origins": [
+    "https://www.iana.org"
+  ],
+  "max_steps": 8,
+  "acceptance": {
+    "url": "https://www.iana.org/help/example-domains",
+    "text": "Example Domains"
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string"
+      },
+      "heading": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "title",
+      "heading"
+    ],
+    "additionalProperties": false
+  }
+}

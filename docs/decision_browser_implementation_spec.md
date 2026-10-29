@@ -1,15 +1,16 @@
 # Decision Browser 実装仕様
 
-文書ID: DBA-SPEC-001 / 版: 1.1
+文書ID: DBA-SPEC-001 / 版: 1.2
 
 既知の手順をコードで実行し、曖昧な判断だけを有限選択のDecisionモデルへ渡す。認可・実行・成功判定はコードが担う。本書は実装契約であり、実接続や本番利用の承認記録ではない。
 
 ## 対象範囲
 
 - 基本経路は、隔離した合成fixtureの検索・一覧抽出・ページ送り。既定CLIはMockで動く。
-- Web経路は別runtimeとし、Google Flights、Wikipedia、固定ホテルfixtureの検索・閲覧に限定する。Flightsの比較日付は両実装で2027-09-20とする。
-- ログイン、CAPTCHA突破、制限回避、予約・購入・送信・削除・権限変更、未審査のアップロード、任意コード実行は禁止する。
-- モデルによるURL・selector・JavaScript・シェルの新規生成、Skillの自己有効化、個人Chromeへの自動接続は認めない。
+- 固定Web経路はGoogle Flights、Wikipedia、ホテルfixtureの検索・閲覧を維持する。Flightsの比較日付は両実装で2027-09-20。
+- 汎用経路は任意URL・自然文goal・許可origin・明示したファイルを受ける。入力、フォーム送信、タブ、frame、抽出とファイル転送を扱い、固定タスクの知識を使わない。
+- ログイン、CAPTCHA突破、制限回避、任意コード実行、Skillの自己有効化、個人Chromeへの自動接続は対象外。外部への書込みは利用者が依頼した範囲に限定する。
+- 汎用plannerは型付き候補と文字列・URLを生成できる。URL・観測済み要素index・許可ファイルを実行前に検査する。生成JavaScript・shell・CSS selectorは実行しない。
 
 ## 構成と契約
 
@@ -22,7 +23,7 @@
 | Policy / Executor | 現在の主体・対象・引数・版・予算を検査し、実行直前に鮮度と対象を確認する。観測から結果検証までを同じbrowser laneで直列化する。 |
 | Verifier / Journal | 独立した事後条件で効果を確認し、送出前の永続記録と復旧を管理する。DONEだけでは成功にしない。 |
 
-データ型は[contracts.py](../src/decision_browser/contracts.py)と[schemas](../schemas/)を正とする。未知enum・余分なキー・必須値欠落・不正な数値を拒否する。日時はUTC、期限は単調時計、通貨額は最小単位の整数で扱う。
+基本経路のデータ型は[contracts.py](../src/decision_browser/contracts.py)と[schemas](../schemas/)、汎用経路は[general/models.py](../src/decision_browser/general/models.py)を正とする。未知enum・余分なキー・必須値欠落・不正な数値を拒否する。日時はUTC、期限は単調時計、通貨額は最小単位の整数で扱う。
 
 ## 判断モデル
 
@@ -33,6 +34,7 @@
 - provider confidenceとstate supportは別の値として記録し、認可や正解率の保証に使わない。閾値は保留データで校正し、調整用データと最終評価を分ける。
 - 独立質問だけをまとめる。他の回答に依存する判断は、コードでその回答を受けてから作る。
 - Webの文字列helperはgpt-4.1-miniとし、観測済みの入力欄へ渡す文字列だけを生成する。判断と同じgoal・進捗を渡し、生成後も対象と鮮度を確認する。
+- 汎用経路では同じhelperが最大3個の型付き操作候補と構造化抽出を生成する。Decision-1が有限候補から選択し、確率・margin・supportの条件を維持する。
 
 ## 実行・停止・復旧
 
@@ -45,6 +47,8 @@
 5. 送信の有無・効果が不明ならUNKNOWN_EFFECTで停止する。キャンセルを外部効果の取消とみなさない。
 
 Web経路のNOT_SENTは、ブラウザが入力送信前と証明できる場合だけ許す。取消記録を永続化してから新しい観測へ進む。入力送信後の例外や保存失敗は再送しない。
+
+汎用経路は外部効果を一律に検証できないため、操作応答をACKNOWLEDGEDとして記録する。完了報告はREPORTED、指定した独立のURL・本文条件が新しい観測に一致した場合だけVERIFIEDとする。自動入力再試行・ダイアログ承認・接続先への再接続は行わず、UNKNOWN_EFFECTまたは既存task-idでは自動再開しない。
 
 operationの一意制約で重複送出を防ぐ。未確定記録を照合するまで再開せず、別task-id・新しいキー・journal削除で回避しない。外部サイトのexactly-onceは保証しない。自動取消・削除によるロールバックも行わない。
 
@@ -81,5 +85,6 @@ fixture性能比較の基準系は同一Controller/Driverで毎回汎用LLMを�
 - 起動・設定: [README](../README.md)
 - 現在の実装範囲、未達条件、停止・復旧: [受入記録](implementation_acceptance.md)
 - Webタスク、試行条件、制約: [比較試験](web_benchmark.md)
+- 汎用タスクの指定と制限: [任意のWebタスク](general_browser.md)
 - 修正後の実接続証跡: [失敗原因と再検証](web_failure_fixes.md)
 - 再実行: [CLI/Chrome検証skill](../.cursor/skills/verify-decision-browser/SKILL.md)、[形式検証skill](../.cursor/skills/verify-decision-browser-safety/SKILL.md)。従来TLA+の範囲はfixture経路に限り、Web runtimeは含まない。

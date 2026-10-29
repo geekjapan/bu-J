@@ -34,7 +34,9 @@ def ready(container):
     return json.loads(docker("exec", container, "cat", "/tmp/ready.json", timeout=5).stdout)
 
 
-def _validate(manifest, state, readiness):
+def _validate(manifest, state, readiness, *, generic=False):
+    if generic and (manifest.get("mode") != "generic" or readiness.get("mode") != "generic"):
+        raise ValueError("Managed Chrome generic mode does not match live readiness")
     host = state["HostConfig"]
     run_id = manifest["run_id"]
     if (str(UUID(run_id)) != run_id or manifest["name"] != f"bu-j-web-{run_id}"
@@ -75,17 +77,18 @@ def _validate(manifest, state, readiness):
     return manifest
 
 
-def validate_manifest(path):
+def validate_manifest(path, *, generic=False):
     manifest = json.loads(Path(path).read_text())
     if not CONTAINER_ID.fullmatch(manifest.get("container", "")):
         raise ValueError("Invalid managed Chrome container ID")
-    return _validate(manifest, inspect(manifest["container"]), ready(manifest["container"]))
+    return _validate(manifest, inspect(manifest["container"]), ready(manifest["container"]), generic=generic)
 
 
 class ManagedChrome:
-    def __init__(self, evidence: Path, base_image_id=None):
+    def __init__(self, evidence: Path, base_image_id=None, *, generic=False):
         self.evidence = Path(evidence)
         self.base_image_id = base_image_id
+        self.generic = generic
         self.run_id = str(uuid4())
         self.name = f"bu-j-web-{self.run_id}"
         self.container = None
@@ -96,7 +99,8 @@ class ManagedChrome:
     def __enter__(self):
         self.evidence.mkdir(parents=True, exist_ok=True)
         try:
-            dockerfile = ROOT / "verification/web_benchmark/Dockerfile"
+            resource = "generic_browser" if self.generic else "web_benchmark"
+            dockerfile = ROOT / f"verification/{resource}/Dockerfile"
             if not dockerfile.is_file():
                 raise RuntimeError("Web benchmark Docker resources missing from repository root")
             base_info = json.loads(docker("image", "inspect", "--platform", "linux/amd64", "bu-j-chrome-verifier:local").stdout)[0]
@@ -108,7 +112,8 @@ class ManagedChrome:
             if json.loads(docker("image", "inspect", "--platform", "linux/amd64", base_ref).stdout)[0]["Id"] != base:
                 raise ValueError("Base image alias changed")
             save(self.evidence / "image.json", {"base_image_id": base, "base_reference": base_ref})
-            tag = f"bu-j-web-benchmark:{self.run_id}"
+            repository = "bu-j-generic-browser" if self.generic else "bu-j-web-benchmark"
+            tag = f"{repository}:{self.run_id}"
             command = ["build", "--platform", "linux/amd64", "--build-arg", f"BASE_IMAGE={base_ref}", "-f", str(dockerfile), "-t", tag, str(ROOT)]
             try:
                 built = docker(*command, timeout=600)
@@ -125,7 +130,7 @@ class ManagedChrome:
             if not layers or built_info["RootFS"]["Layers"][:len(layers)] != layers:
                 raise ValueError("Built image does not contain the captured base layers")
             run_ref = next(ref for ref in built_info["RepoDigests"]
-                           if re.fullmatch(r"bu-j-web-benchmark@sha256:[0-9a-f]{64}", ref))
+                           if re.fullmatch(rf"{repository}@sha256:[0-9a-f]{{64}}", ref))
             platform_image_id, image_id = image_id, run_ref.split("@", 1)[1]
             save(self.evidence / "image.json", {"base_image_id": base, "base_reference": base_ref,
                  "image_id": image_id, "platform_image_id": platform_image_id, "run_reference": run_ref})
@@ -155,9 +160,11 @@ class ManagedChrome:
             path = urlsplit(readiness["version"]["webSocketDebuggerUrl"]).path
             self.manifest = dict(endpoint=f"ws://127.0.0.1:{port}{path}", container=self.container,
                                  name=self.name, run_id=self.run_id, image_id=image_id, port=port)
+            if self.generic:
+                self.manifest["mode"] = "generic"
             save(self.evidence / "inspect.json", state)
             save(self.evidence / "ready.json", readiness)
-            _validate(self.manifest, state, readiness)
+            _validate(self.manifest, state, readiness, generic=self.generic)
             save(self.manifest_path, self.manifest)
             return self
         except BaseException:

@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Browser boundary sandbox</title>
+<body>
+  <h1>Browser boundary sandbox</h1>
+  <p>These controls test navigation and confirmation boundaries.</p>
+  <button data-testid="redirect-out" onclick="location.href='/redirect-out'">Redirect outside allowed origin</button>
+  <button data-testid="popup-out" onclick="window.open('http://localhost:__PORT__/boundary-target', '_blank')">Open outside allowed origin</button>
+  <button data-testid="confirm-action" onclick="if (confirm('Apply sandbox action?')) fetch('/confirm-action')">Confirm sandbox action</button>
+</body>
+</html>

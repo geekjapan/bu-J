@@ -13,6 +13,7 @@ records Alpha, Beta, Gamma, Delta and Epsilon, with IDs 001â€“005 and October 1â
 - [Azure model](azure.md): live inference gate; unrun during skill creation.
 - [Actual Chrome](chrome.md): isolated Docker, real MCP and Controller; seven of eight journeys pass, empty-search navigation race remains.
 - [Three web tasks](web.md): separate web CLI, disposable Chrome, real Azure comparison, and independent completion checks.
+- [General browser tasks](general.md): arbitrary goals, native input, frames, tabs, scoped files, extraction, and separate live planner acceptance.
 
 Each user entry point has its own command and expected observable state. CLI
 proof includes argv, stdout, stderr, exit status, stored rows and exported events.

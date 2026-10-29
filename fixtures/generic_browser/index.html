@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Northstar Procurement Desk</title><link rel="stylesheet" href="/style.css"></head>
+<body><header><span class="badge">Northstar · supplier operations</span><h1>Procurement desk</h1><p>A local practice workspace. All requests stay in this sandbox.</p></header>
+<main>
+<section aria-labelledby="request-title"><h2 id="request-title">1. Prepare a purchase request</h2><p>Register the colleague who will receive the quotation.</p>
+<form action="/action/request" method="post" data-result="request-result">
+<label for="requester">Requester name</label><input id="requester" name="name" required maxlength="200" data-testid="requester-name">
+<label for="department">Department</label><select id="department" name="department" data-testid="department"><option value="Research">Research</option><option value="Operations">Operations</option><option value="Finance">Finance</option></select>
+<label><input type="checkbox" name="priority" data-testid="priority"> Mark as priority</label>
+<button data-testid="submit-request">Submit purchase request</button></form><output id="request-result" aria-live="polite" data-testid="request-result"></output></section>
+<section><h2>2. Confirm warehouse contacts</h2><p>Each warehouse keeps its own confirmation record.</p><h3>Local warehouse</h3><iframe title="Local warehouse confirmation" src="/same-frame" data-testid="same-frame"></iframe><h3>External warehouse</h3><iframe title="External warehouse confirmation" src="http://localhost:__PORT__/cross-frame" data-testid="cross-frame"></iframe></section>
+<section><h2>3. Add a packaging note</h2><p>The supplier widget below stores a separate packaging confirmation.</p><div id="packaging-widget" data-testid="shadow-host"></div></section>
+<section><h2>4. Review the quotation</h2><p>Open the quotation in a new tab, review it, then return to this desk.</p><a class="button" href="/detail" target="_blank" rel="noopener" data-testid="open-quotation">Open quotation in new tab</a></section>
+<section><h2>5. Attach the specification</h2><form action="/upload" method="post" enctype="multipart/form-data" data-result="upload-result"><label for="specification">Specification file</label><input id="specification" type="file" name="specification" required data-testid="specification-file"><br><button data-testid="upload-specification">Upload specification</button></form><output id="upload-result" aria-live="polite" data-testid="upload-result"></output><a class="button" href="/download" download data-testid="download-quotation">Download quotation text</a></section>
+<section><h2>6. Complete the receiving check</h2><p>The receiving confirmation is at the bottom of this section.</p><div class="scroll-space"><p>Receiving bay · continue down to the sign-off desk ↓</p></div><form action="/action/scroll" method="post" data-result="receiving-result"><label for="receiver">Receiving officer</label><input id="receiver" name="name" required maxlength="200" data-testid="receiving-name"><br><button data-testid="confirm-receiving">Confirm receiving check</button></form><output id="receiving-result" aria-live="polite" data-testid="receiving-result"></output></section>
+</main>
+<script>
+async function submitForm(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const output = form.getRootNode().getElementById(form.dataset.result);
+  const multipart = form.enctype === 'multipart/form-data';
+  try {
+    const response = await fetch(form.action, {method: 'POST', body: multipart ? new FormData(form) : new URLSearchParams(new FormData(form))});
+    const result = await response.json();
+    output.textContent = response.ok ? `Confirmed ${result.action} #${result.count}\n${JSON.stringify(result)}` : result.error;
+  } catch (error) { output.textContent = `Request failed: ${error.message}`; }
+}
+document.querySelectorAll('form').forEach(form => form.addEventListener('submit', submitForm));
+const shadow = document.getElementById('packaging-widget').attachShadow({mode: 'open'});
+shadow.innerHTML = `<link rel="stylesheet" href="/style.css"><form action="/action/shadow" method="post" data-result="packaging-result"><label for="packaging">Packaging note</label><input id="packaging" name="name" required maxlength="200" data-testid="packaging-note"><br><button data-testid="save-packaging">Save packaging note</button></form><output id="packaging-result" aria-live="polite" data-testid="packaging-result"></output>`;
+shadow.querySelector('form').addEventListener('submit', submitForm);
+</script></body></html>
