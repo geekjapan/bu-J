@@ -320,6 +320,8 @@ def make_session(*, target_id: str | None = None, **options) -> BoundedBrowserSe
         raise ValueError('Existing websocket CDP endpoint required')
     if options.get('proxy'):
         raise ValueError('Proxy authentication is unsupported by bounded sessions')
+    # Display detection must not resize an existing CDP browser on a displayless host.
+    options['headless'] = False
     options['no_viewport'] = True
     options['highlight_elements'] = False
     options['dom_highlight_elements'] = False

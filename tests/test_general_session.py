@@ -361,3 +361,15 @@ async def test_popup_discovery_never_adopts_unrelated_or_existing_targets(sessio
     await session.session_manager._target_created({'targetInfo': info})
     assert session.cdp_client.calls == []
     assert session.task_target_ids == {'t'}
+
+
+@pytest.mark.parametrize('headless_environment', ['true', 'false'])
+def test_existing_browser_never_gets_a_viewport_on_a_displayless_host(monkeypatch, headless_environment):
+    from browser_use.browser import profile
+    monkeypatch.setenv('BROWSER_USE_HEADLESS', headless_environment)
+    monkeypatch.setattr(profile, 'get_display_size', lambda: None)
+    instance = bounded.make_session(cdp_url='ws://localhost:9222/devtools/browser/id',
+                                    allowed_domains=['https://example.com'])
+    assert instance.browser_profile.no_viewport is True
+    assert instance.browser_profile.viewport is None
+    assert instance.browser_profile.device_scale_factor is None
