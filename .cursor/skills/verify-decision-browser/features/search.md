@@ -16,9 +16,9 @@ Search returns synthetic records whose names contain the query and collects all 
 
 ## Driving it with control.py
 
-Preconditions: fresh Launch and passing Doctor; use the repository's `.venv/bin/python` and its saved `RUN`.
+Preconditions: fresh Launch and passing Doctor; use the repository's `uv run --no-sync python` and its saved `RUN`.
 
-- **All three entries.** Run `.venv/bin/python .cursor/skills/verify-decision-browser/scripts/control.py drive --run "$RUN" --feature search`. It launches the three exact query variants with isolated journals and explicit output, task and audit flags.
+- **All three entries.** Run `uv run --no-sync python .cursor/skills/verify-decision-browser/scripts/control.py drive --run "RUN_PATH" --feature search`. It launches the three exact query variants with isolated journals and explicit output, task and audit flags.
 - **All records.** `all-records/result.json` shows `SUCCEEDED`, the five known IDs/names/dates, six steps and zero model calls. SQLite contains six VERIFIED operations; observation events cover page indices 0, 1, 2 and 3.
 - **Filter.** `filtered/result.json` contains Alpha, Beta, Gamma, Delta in order, four steps and four VERIFIED operations.
 - **No matches.** `empty/result.json` contains an empty records array, `SUCCEEDED`, two steps and two VERIFIED operations (search and extraction).

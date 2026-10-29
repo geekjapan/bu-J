@@ -15,7 +15,7 @@ Observe-only reports the current synthetic page and a proposal without dispatchi
 
 Preconditions: fresh Launch and passing Doctor with the saved `RUN`.
 
-- **Observe.** Run `.venv/bin/python .cursor/skills/verify-decision-browser/scripts/control.py drive --run "$RUN" --feature observe`.
+- **Observe.** Run `uv run --no-sync python .cursor/skills/verify-decision-browser/scripts/control.py drive --run "RUN_PATH" --feature observe`.
 - **Visible result.** `observe-only/result.json` shows `OBSERVED`, `OBSERVE_ONLY_NO_ACTION`, zero steps, zero model calls and no records.
 - **Stored effect.** The independent SQLite read finds zero rows in `operations`, with only `task_started`, `observation`, `proposal_only` events. The stored page remains unsearched at page zero.
 - **Proof.** Inspect `observe-proof.json`, command transcript, audit export and SQLite backup before Cleanup.

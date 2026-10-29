@@ -201,8 +201,8 @@ def test_azure_cli_auth_is_explicit_fixed_argv_and_failure_redacted(monkeypatch,
     cli_args(monkeypatch, tmp_path, '--provider', 'azure', '--azure-auth', 'azure-cli')
     assert cli.main() == 1
     argv, kwargs = calls[0]
-    assert argv == ['az', 'account', 'get-access-token', '--resource', 'https://cognitiveservices.azure.com/', '--query', 'accessToken', '--output', 'tsv']
-    assert kwargs == {'check': True, 'capture_output': True, 'text': True, 'timeout': 10}
+    assert argv == [cli.azure_cli_executable(), 'account', 'get-access-token', '--resource', 'https://cognitiveservices.azure.com/', '--query', 'accessToken', '--output', 'tsv']
+    assert kwargs == {'check': True, 'capture_output': True, 'text': True, 'encoding': 'utf-8', 'timeout': 10}
     assert 'secret-value' not in capsys.readouterr().err
 
 
@@ -226,8 +226,8 @@ def test_cli_default_azure_cli_auth_passes_captured_token_and_closes_provider(mo
     cli_args(monkeypatch, tmp_path, '--provider', 'azure', '--mode', 'enforced')
     assert cli.main() == 1
     assert calls == [(
-        ['az', 'account', 'get-access-token', '--resource', 'https://cognitiveservices.azure.com/', '--query', 'accessToken', '--output', 'tsv'],
-        {'check': True, 'capture_output': True, 'text': True, 'timeout': 10},
+        [cli.azure_cli_executable(), 'account', 'get-access-token', '--resource', 'https://cognitiveservices.azure.com/', '--query', 'accessToken', '--output', 'tsv'],
+        {'check': True, 'capture_output': True, 'text': True, 'encoding': 'utf-8', 'timeout': 10},
     )]
     assert constructed == [(ENDPOINT, 'configured-deployment', {'entra_token': 'test-token'})]
     assert len(providers) == 1 and providers[0].client.is_closed

@@ -16,7 +16,7 @@ This is a bounded model check plus real-code refinement checks. It is not a proo
 From the repository root, use the existing Python 3.12+ environment with this project and its dependencies installed, and Java 11+ on PATH. The confirmed environment was Python 3.12.11 and OpenJDK 27. If the virtual environment is missing, use the repository setup command `uv sync --locked --extra dev` first.
 
 ```bash
-.venv/bin/python verification/formal/run.py
+uv run --no-sync python verification/formal/run.py
 ```
 
 The runner fetches the official [TLA+ tools v1.8.0 release](https://github.com/tlaplus/tlaplus/releases/tag/v1.8.0) JAR into ignored `.audit/formal/tools/` only when absent. It always verifies SHA256 `fc6878c603f0fdc18b9fe3e5bf51860cb90ab5b1154e3c371660c036d6bdd63e`; do not commit the JAR. It runs TLC breadth-first with one worker, a fixed seed/fingerprint polynomial, and a 512 MB heap. No browser service, model provider, credentials, or paid call is used.
@@ -52,10 +52,10 @@ The authoritative coverage record is [coverage.json](../../../verification/forma
 When a covered source hash changes, the runner stops before verification. Read the changed functions and the refinement map; update model actions, crash checkpoints and mutation controls if intended behavior changed. Only after confirming correspondence, record current hashes and the real HEAD (or `null` if HEAD is unborn or any covered file differs from HEAD):
 
 ```bash
-.venv/bin/python verification/formal/run.py --record-sync
-.venv/bin/python verification/formal/run.py
+uv run --no-sync python verification/formal/run.py --record-sync
+uv run --no-sync python verification/formal/run.py
 ```
 
-The runner only records a non-null commit when every covered file matches the bytes stored in HEAD. Dirty or untracked covered files retain `null` and a working-tree snapshot note. Check this behavior with `.venv/bin/python -m unittest discover -s verification/formal -p "test_*.py"`.
+The runner only records a non-null commit when every covered file matches the bytes stored in HEAD. Dirty or untracked covered files retain `null` and a working-tree snapshot note. Check this behavior with `uv run --no-sync python -m unittest discover -s verification/formal -p "test_*.py"`.
 
 After the first commit exists, follow that same review and recording procedure to replace `null` with the actual commit. `--record-sync` records evidence; it does not prove correspondence. Do not advance it just to silence drift. On later maintenance, use `/maintain-formal-verification-skill` to reconcile changes that bypassed this check.

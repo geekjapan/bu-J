@@ -7,12 +7,16 @@ import json
 import os
 from pathlib import Path
 import platform
-import resource
 import statistics
 import subprocess
 import sys
 import time
 from uuid import uuid4
+
+try:
+    import resource
+except ImportError:
+    resource = None
 
 from decision_browser.web.environment import ManagedChrome, validate_manifest
 from decision_browser.web.provider import ModelClient
@@ -22,7 +26,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def save(path, value):
-    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + '\n')
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+
+def children_cpu_seconds():
+    if resource is None:
+        return None
+    usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return usage.ru_utime + usage.ru_stime
 
 
 def upstream_run(args):
@@ -106,7 +117,8 @@ def suite(args):
         'timing': 'First prediction after initial observation through fresh accepted DONE; setup and independent verifier excluded.',
         'baseline': 'Unchanged pinned Agent loop; shared Azure, scoped DOM/CDP transport and safety filtering adapters. Not pristine historical TypeSafe result.',
         'historical_differences': ['future date2027-09-20','AzureDecision1 instead ofTypeSafeJev','GPT4.1mini instead ofMercury','Docker headlessChrome156 instead ofChrome152existingprofile','shared scopedproxy/CDP/controlpolicy','strict independentWikiarticlecontent andadult/economy checks'],
-        'machine': {'platform': platform.platform(), 'cores': os.cpu_count(), 'loadavg': os.getloadavg()},
+        'machine': {'platform': platform.platform(), 'cores': os.cpu_count(),
+                    'loadavg': os.getloadavg() if hasattr(os, 'getloadavg') else None},
         'source_sha256': sources, 'created_at': datetime.now(timezone.utc).isoformat()})
     rows = []
     print(str(folder), flush=True)
@@ -120,7 +132,7 @@ def suite(args):
                 command = [sys.executable, '-m', 'benchmarks.web', 'upstream' if arm == 'upstream' else 'bu-j',
                     '--task', task, '--flight-date', args.flight_date, '--journal', str(directory/'journal.sqlite3'),
                     '--task-id', directory.name, '--output', str(output)]
-                cpu = resource.getrusage(resource.RUSAGE_CHILDREN)
+                cpu = children_cpu_seconds()
                 process = None
                 infrastructure_error = False
                 child_started = False
@@ -134,17 +146,17 @@ def suite(args):
                         command += ['--manifest', str(chrome.manifest_path)]
                         save(directory / 'command.json', {'argv': command})
                         child_started = True
-                        process = subprocess.run(command, cwd=ROOT, env=environment, capture_output=True, text=True, timeout=180)
+                        process = subprocess.run(command, cwd=ROOT, env=environment, capture_output=True, text=True, timeout=180, encoding='utf-8')
                         save(directory / 'process.json', {'returncode': process.returncode, 'stdout': process.stdout, 'stderr': process.stderr})
                 except Exception as error:
                     infrastructure_error = True
                     save(directory / 'infrastructure-error.json', {'exception_type': type(error).__name__})
                     if not output.exists():
                         save(output, {'status': 'FAILED', 'reason': 'INFRASTRUCTURE_ERROR', 'exception_type': type(error).__name__})
-                data = json.loads(output.read_text())
+                data = json.loads(output.read_text(encoding='utf-8'))
                 calls, helpers = data.get('calls', []), data.get('model_text_calls', [])
                 usage_unknown = child_started and (process is None or 'calls' not in data or 'model_text_calls' not in data)
-                cpu_after = resource.getrusage(resource.RUSAGE_CHILDREN)
+                cpu_after = children_cpu_seconds()
                 row = {'task': task, 'trial': trial+1, 'arm': arm,
                     'status': 'INFRASTRUCTURE_ERROR' if infrastructure_error else data.get('status','FAILED'), 'reason': data.get('reason',''),
                     'verified': not infrastructure_error and data.get('status') == 'SUCCEEDED' and data.get('independent_verification',{}).get('passed') is True,
@@ -152,7 +164,7 @@ def suite(args):
                     'helper_calls': None if usage_unknown else len(helpers), 'api_usage_unknown': usage_unknown,
                     'tokens': None if usage_unknown else data.get('total_tokens',0), 'api_error_calls': sum(c.get('http_status') != 200 for c in calls+helpers),
                     'model_latency_ms': sum(c.get('latency_ms',0) for c in calls+helpers),
-                    'cpu_seconds_children': (cpu_after.ru_utime+cpu_after.ru_stime)-(cpu.ru_utime+cpu.ru_stime),
+                    'cpu_seconds_children': cpu_after - cpu if cpu is not None and cpu_after is not None else None,
                     'cdp_calls_run': sum(data.get('cdp_counts_run',{}).values()), 'evidence': str(directory)}
                 rows.append(row)
                 save(folder / 'runs.json', rows)

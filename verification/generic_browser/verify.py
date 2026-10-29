@@ -20,12 +20,12 @@ from decision_browser.web.environment import ManagedChrome, validate_manifest
 def state(container):
     script = "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8766/state').read().decode())"
     return json.loads(subprocess.run(["docker", "exec", container, "python", "-c", script],
-                                    capture_output=True, text=True, check=True, timeout=10).stdout)
+                                    capture_output=True, text=True, check=True, timeout=10, encoding='utf-8').stdout)
 
 
 async def drive(manifest, output):
     upload = output / "specification.txt"
-    upload.write_text("Northstar verification specification\n")
+    upload.write_text("Northstar verification specification\n", encoding='utf-8')
     task = Task(url="http://127.0.0.1:8766/", goal="Exercise the procurement sandbox",
                 allowed_origins=["http://127.0.0.1:8766", "http://localhost:8766"],
                 uploads={"specification": str(upload)})
@@ -120,7 +120,7 @@ async def drive(manifest, output):
         proof = {"passed": True, "steps": steps, "before": before, "after": final,
                  "downloads": downloads, "uploads": receipts,
                  "screenshot_sha256": hashlib.sha256(image).hexdigest(), "model_calls": 0}
-        (output / "proof.json").write_text(json.dumps(proof, ensure_ascii=False, indent=2) + "\n")
+        (output / "proof.json").write_text(json.dumps(proof, ensure_ascii=False, indent=2) + "\n", encoding='utf-8')
         journal.finish(task_id, "VERIFIED")
         return proof
     finally:

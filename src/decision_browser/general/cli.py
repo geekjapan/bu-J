@@ -19,7 +19,7 @@ from ..web.environment import ManagedChrome, validate_manifest
 
 
 def save(path, value):
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n")
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding='utf-8')
 
 
 async def execute(args, task, output, journal):
@@ -79,7 +79,7 @@ def main(argv=None):
     created = False
     result = {"status": "FAILED", "task_id": args.task_id}
     try:
-        task = Task.model_validate_json(Path(args.task).read_text())
+        task = Task.model_validate_json(Path(args.task).read_text(encoding='utf-8'))
         output.mkdir(parents=True, exist_ok=False)
         created = True
         save(output / "task.json", task.model_dump())
@@ -87,7 +87,7 @@ def main(argv=None):
         result = asyncio.run(execute(args, task, output, journal))
     except Exception as error:
         if created and (output / "result.json").exists():
-            result = json.loads((output / "result.json").read_text())
+            result = json.loads((output / "result.json").read_text(encoding='utf-8'))
         if result["status"] != "UNKNOWN_EFFECT":
             result["status"] = "FAILED"
         result["error"] = {"type": type(error).__name__, "message": str(error)[:500]}

@@ -14,7 +14,7 @@ import tempfile
 import uuid
 
 ROOT = Path(__file__).resolve().parents[4]
-CLI = ROOT / '.venv/bin/decision-browser'
+CLI = ROOT / ('.venv/Scripts/decision-browser.exe' if os.name == 'nt' else '.venv/bin/decision-browser')
 EXPECTED = [
     {'id': '001', 'name': 'Alpha', 'updated_at': '2026-10-01'},
     {'id': '002', 'name': 'Beta', 'updated_at': '2026-10-02'},
@@ -25,13 +25,13 @@ EXPECTED = [
 
 
 def write(path, value):
-    path.write_text(json.dumps(value, indent=2) + '\n')
+    path.write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
 
 
 def doctor():
     assert sys.version_info >= (3, 12), 'Use .venv/bin/python (Python >=3.12)'
     versions = {name: importlib.metadata.version(name) for name in ('decision-browser', 'pydantic', 'httpx')}
-    process = subprocess.run([str(CLI), '--help'], cwd=ROOT, capture_output=True, text=True, timeout=15)
+    process = subprocess.run([str(CLI), '--help'], cwd=ROOT, capture_output=True, text=True, encoding='utf-8', timeout=15)
     assert process.returncode == 0 and '--provider {mock,azure}' in process.stdout, process.stderr
     return {'python': sys.executable, 'versions': versions, 'cli': str(CLI),
             'argv': [str(CLI), '--help'], 'stdout': process.stdout,
@@ -42,7 +42,7 @@ def doctor():
 def load_run(path):
     evidence = Path(path).resolve()
     assert evidence.parent == ROOT / '.audit/verification-skill', 'Unexpected evidence directory'
-    manifest = json.loads((evidence / 'run.json').read_text())
+    manifest = json.loads((evidence / 'run.json').read_text(encoding='utf-8'))
     runtime = Path(manifest['runtime'])
     assert runtime.parent == Path(tempfile.gettempdir()).resolve(), 'Unexpected runtime parent'
     assert runtime.name.startswith('decision-browser-verify-'), 'Unexpected runtime name'
@@ -78,11 +78,11 @@ def invoke(evidence, runtime, label, *, query='', mode='enforced', routing='rule
             '--routing', routing, '--journal', str(db), '--task-id', task_id,
             '--output', str(output), '--audit-jsonl', str(audit)]
     env = {key: value for key, value in os.environ.items() if not key.startswith('AZURE_')}
-    process = subprocess.run(argv, cwd=runtime, env=env, capture_output=True, text=True, timeout=30)
+    process = subprocess.run(argv, cwd=runtime, env=env, capture_output=True, text=True, encoding='utf-8', timeout=30)
     write(folder / 'command.json', {'argv': argv, 'cwd': str(runtime), 'stdout': process.stdout,
           'stderr': process.stderr, 'exit_code': process.returncode, 'task_id': task_id})
     state = snapshot(db, folder)
-    result = json.loads(output.read_text()) if output.exists() else None
+    result = json.loads(output.read_text(encoding='utf-8')) if output.exists() else None
     if failure:
         assert process.returncode == 1 and 'SQLite journal remains authoritative' in process.stderr
         assert result is None and not process.stdout
@@ -91,7 +91,7 @@ def invoke(evidence, runtime, label, *, query='', mode='enforced', routing='rule
     else:
         assert process.returncode == 0, (label, process.stderr, process.stdout)
         assert result == json.loads(process.stdout), label
-        exported = [json.loads(line) for line in audit.read_text().splitlines()]
+        exported = [json.loads(line) for line in audit.read_text(encoding='utf-8').splitlines()]
         assert [(event['event_type'], event['metadata']) for event in exported] == state['events']
         assert all(event['task_id'] == task_id for event in exported)
     return result, state, task_id
@@ -104,7 +104,7 @@ def success(result, state, records, steps):
 
 
 def drive(evidence, runtime, feature):
-    assert (runtime / 'owner').read_text() == evidence.name, 'Runtime ownership mismatch'
+    assert (runtime / 'owner').read_text(encoding='utf-8') == evidence.name, 'Runtime ownership mismatch'
     if feature == 'search':
         result, state, _ = invoke(evidence, runtime, 'all-records')
         success(result, state, EXPECTED, 6)
@@ -141,7 +141,7 @@ def drive(evidence, runtime, feature):
         folder.mkdir()
         argv = [str(CLI), '--provider', 'mock', '--query', 'a', '--mode', 'enforced', '--routing', 'rules',
                 '--task-id', task_id, '--journal', str(runtime / 'replay.sqlite3')]
-        process = subprocess.run(argv, cwd=runtime, capture_output=True, text=True, timeout=30)
+        process = subprocess.run(argv, cwd=runtime, capture_output=True, text=True, encoding='utf-8', timeout=30)
         write(folder / 'command.json', {'argv': argv, 'cwd': str(runtime), 'stdout': process.stdout,
               'stderr': process.stderr, 'exit_code': process.returncode})
         replay = json.loads(process.stdout)
@@ -166,7 +166,7 @@ def main():
         evidence = ROOT / '.audit/verification-skill' / uuid.uuid4().hex
         evidence.mkdir(parents=True)
         runtime = Path(tempfile.mkdtemp(prefix='decision-browser-verify-')).resolve()
-        (runtime / 'owner').write_text(evidence.name)
+        (runtime / 'owner').write_text(evidence.name, encoding='utf-8')
         write(evidence / 'run.json', {'runtime': str(runtime), 'root': str(ROOT)})
         write(evidence / 'doctor.json', report)
         boundary = {}
@@ -191,7 +191,7 @@ def main():
             print(evidence / f'{args.feature}-proof.json')
         else:
             if runtime.exists():
-                assert (runtime / 'owner').read_text() == evidence.name, 'Runtime ownership mismatch'
+                assert (runtime / 'owner').read_text(encoding='utf-8') == evidence.name, 'Runtime ownership mismatch'
                 shutil.rmtree(runtime)
             assert not runtime.exists()
             proofs = sorted(p.name for p in evidence.glob('*-proof.json'))

@@ -19,7 +19,7 @@ Users choose known rules, model selection or hybrid routing and can compare shad
 
 Preconditions: fresh Launch and passing Doctor with the saved `RUN`; no Azure prerequisite.
 
-- **All five entries.** Run `.venv/bin/python .cursor/skills/verify-decision-browser/scripts/control.py drive --run "$RUN" --feature routing`.
+- **All five entries.** Run `uv run --no-sync python .cursor/skills/verify-decision-browser/scripts/control.py drive --run "RUN_PATH" --feature routing`.
 - **Same output.** Each result contains the five known records, six steps and six VERIFIED operations.
 - **Routing difference.** Enforced rules and hybrid have zero model calls and zero decision events. Enforced model and both shadow variants have six Mock calls and six decision events.
 - **Comparison.** Each decision identifies `mock-v1`, the requested mode and `comparison_match: true`. Per-command argv proves which route was selected.

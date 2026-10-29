@@ -1,6 +1,8 @@
 """Actual Chrome acceptance. Run: .venv/bin/python verification/chrome/run.py."""
 from __future__ import annotations
 
+from decision_browser._runtime import azure_cli_executable
+
 import asyncio
 import argparse
 import base64
@@ -41,12 +43,12 @@ EXPECTED = [
 
 
 def save(path, value):
-    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + '\n')
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
 
 
 def docker(*args, check=True, timeout=60):
     return subprocess.run(['docker', *args], cwd=ROOT, env=ENV, text=True, capture_output=True,
-                          check=check, timeout=timeout)
+                          check=check, timeout=timeout, encoding='utf-8')
 
 
 def cleanup(evidence, name, run_id, container):
@@ -62,7 +64,7 @@ def cleanup(evidence, name, run_id, container):
         receipt['container'] = container
         try:
             logs = docker('logs', container, check=False)
-            (evidence / 'container.log').write_text(logs.stdout + logs.stderr)
+            (evidence / 'container.log').write_text(logs.stdout + logs.stderr, encoding='utf-8')
         except (subprocess.SubprocessError, OSError) as error:
             receipt['diagnostic_error'] = repr(error)
         finally:
@@ -158,9 +160,9 @@ class EvidenceAzureProvider(AzureDecisionProvider):
 
 def live_azure_provider(evidence):
     endpoint = validate_endpoint(os.environ.get('AZURE_ENDPOINT', ''))
-    token = subprocess.run(['az', 'account', 'get-access-token', '--resource',
+    token = subprocess.run([azure_cli_executable(), 'account', 'get-access-token', '--resource',
         'https://cognitiveservices.azure.com/', '--query', 'accessToken', '--output', 'tsv'],
-        capture_output=True, text=True, check=True, timeout=10).stdout.strip()
+        capture_output=True, text=True, check=True, timeout=10, encoding='utf-8').stdout.strip()
     return EvidenceAzureProvider(endpoint, os.environ.get('AZURE_DEPLOYMENT_NAME', 'decision-1'), token, evidence)
 
 
@@ -201,10 +203,10 @@ p=importlib.util.find_spec('mcp_server').origin
 print(json.dumps({'python':platform.python_version(),'platform':platform.platform(),'harness':importlib.metadata.version('browser-harness'),'mcp':importlib.metadata.version('mcp'),'mcp_source_sha256':hashlib.sha256(open(p,'rb').read()).hexdigest(),'chrome':subprocess.check_output(['google-chrome','--version'],text=True).strip()}))''')
     versions = json.loads(metadata.stdout)
     save(evidence / 'versions.json', versions)
-    (evidence / 'distributed-mcp-server.py').write_text(docker('exec', container, 'python', '-c', "import importlib.util; print(open(importlib.util.find_spec('mcp_server').origin).read(), end='')").stdout)
-    (evidence / 'chrome-deb.sha256').write_text(docker('exec', container, 'cat', '/opt/verification/chrome-deb.sha256').stdout)
-    (evidence / 'installed-packages.txt').write_text(docker('exec', container, 'pip', 'freeze', '--all').stdout)
-    (evidence / 'chrome-package.txt').write_text(docker('exec', container, 'dpkg-query', '-W', 'google-chrome-stable').stdout)
+    (evidence / 'distributed-mcp-server.py').write_text(docker('exec', container, 'python', '-c', "import importlib.util; print(open(importlib.util.find_spec('mcp_server').origin).read(), end='')").stdout, encoding='utf-8')
+    (evidence / 'chrome-deb.sha256').write_text(docker('exec', container, 'cat', '/opt/verification/chrome-deb.sha256').stdout, encoding='utf-8')
+    (evidence / 'installed-packages.txt').write_text(docker('exec', container, 'pip', 'freeze', '--all').stdout, encoding='utf-8')
+    (evidence / 'chrome-package.txt').write_text(docker('exec', container, 'dpkg-query', '-W', 'google-chrome-stable').stdout, encoding='utf-8')
     assert versions['harness'] == '0.1.13' and versions['mcp'] == '2.1.1'
     assert versions['chrome'].startswith('Google Chrome ')
     ready = None
@@ -317,7 +319,7 @@ print(json.dumps(out))''').stdout)
                     for seq, stamp, task_id, event, payload in journal.db.execute('SELECT * FROM events ORDER BY sequence')]
                 snapshots = [json.loads(row[0]) for row in journal.db.execute('SELECT snapshot FROM observations ORDER BY rowid')]
                 save(directory / 'sqlite-state.json', {'operations': operations, 'events': events, 'observations': snapshots})
-                audit_matches = [json.loads(line) for line in (directory / 'audit.jsonl').read_text().splitlines()] == events
+                audit_matches = [json.loads(line) for line in (directory / 'audit.jsonl').read_text(encoding='utf-8').splitlines()] == events
                 expected = {'state': state, 'steps': steps, 'records': records, 'model_calls': steps if provider else 0, 'reason': reason}
                 actual = {key: result[key] for key in expected}
                 passed = audit_matches and actual == expected and operations == [{'state': 'VERIFIED', 'reason': 'POSTCONDITION_VERIFIED'}] * steps
@@ -383,7 +385,7 @@ def main():
     try:
         save(evidence / 'build-command.json', {'argv': ['docker', 'build', '--platform', 'linux/amd64', '-f', 'verification/chrome/Dockerfile', '-t', IMAGE, '.'], 'cwd': str(ROOT), 'runner_pid': os.getpid()})
         build = docker('build', '--platform', 'linux/amd64', '-f', 'verification/chrome/Dockerfile', '-t', IMAGE, '.', timeout=900)
-        (evidence / 'build.log').write_text(build.stdout + build.stderr)
+        (evidence / 'build.log').write_text(build.stdout + build.stderr, encoding='utf-8')
         images = json.loads(docker('image', 'inspect', IMAGE).stdout)
         save(evidence / 'image-inspect.json', images)
         image_id = images[0]['Id']
@@ -396,7 +398,7 @@ def main():
         save(evidence / 'created.json', {'container': started.stdout.strip(), 'name': name, 'run_id': run_id})
         asyncio.run(verify(evidence, name, run_id, container, image_id, args.provider))
     except BaseException:
-        (evidence / 'failure.txt').write_text(traceback.format_exc())
+        (evidence / 'failure.txt').write_text(traceback.format_exc(), encoding='utf-8')
         raise
     finally:
         if run_attempted:

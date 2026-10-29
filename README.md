@@ -10,6 +10,10 @@ The Driver runtime executes browser actions. Requires Python 3.12, uv, and Docke
 
 Driverはブラウザ操作を実行する本体です。Python 3.12、uv、実Chrome用のDockerを用意し、リポジトリ直下で実行します。
 
+On Windows, use PowerShell and Docker Desktop with its WSL 2 Linux-container backend. Run the same `uv` commands; no virtual environment activation is required.
+
+WindowsではPowerShellと、WSL 2・Linuxコンテナ設定のDocker Desktopを使います。`uv`コマンドは共通で、仮想環境のactivateは不要です。
+
 ```sh
 uv sync --locked --extra web --extra generic --python 3.12
 uv run decision-browser-general --help
@@ -47,8 +51,7 @@ This calls the paid Azure API with the synthetic browser. For real Chrome, set `
 このコマンドは合成ブラウザで有料のAzure APIを呼びます。実Chromeには`AZURE_TEXT_ENDPOINT`と`AZURE_TEXT_DEPLOYMENT`へ既存のgpt-4.1-miniを設定し、サンプルタスクを実行します。
 
 ```sh
-uv run --no-sync --env-file .env decision-browser-general \
-  --task examples/general-task.json --launch --output .audit/example-general
+uv run --no-sync --env-file .env decision-browser-general --task examples/general-task.json --launch --output .audit/example-general
 ```
 
 Edit the sample URL and goal for your task. See [task options](docs/general_browser.md). Use a new output directory for each run.

@@ -197,8 +197,11 @@ class HarnessSettings:
             raise ValueError("explicit dedicated loopback endpoint, profile, runtime, daemon, origin and tab required")
 
     def environment(self) -> dict[str, str]:
-        return {"PATH": os.defpath, "BU_CDP_WS": self.endpoint, "BU_NAME": self.daemon_name,
+        env = {"PATH": os.defpath, "BU_CDP_WS": self.endpoint, "BU_NAME": self.daemon_name,
                 "BH_RUNTIME_DIR": str(self.runtime_dir), "BH_UPDATE_CHECK": "0", "BH_OPEN_LIVE_URL": "0"}
+        if os.name == 'nt' and 'SystemRoot' in os.environ:
+            env['SystemRoot'] = os.environ['SystemRoot']
+        return env
 
 
 EXTRACT_FIXTURE = """(() => {

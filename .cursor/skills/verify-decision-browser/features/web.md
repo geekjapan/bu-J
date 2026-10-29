@@ -7,7 +7,7 @@ Follow [the web benchmark recipe](../../../../docs/web_benchmark.md) from the re
 For the model-free hotel control check, run:
 
 ```sh
-.venv/bin/python verification/web_benchmark/check_controls.py
+uv run --no-sync python verification/web_benchmark/check_controls.py
 ```
 
 Require five observed effects, a passing independent final verification, the retained PNG, and a cleanup receipt with `absent: true`. This check supplies known input directly and does not establish model-controlled completion.
@@ -19,7 +19,7 @@ See [the failure fixes and live acceptance record](../../../../docs/web_failure_
 The runtime's focused local checks are:
 
 ```sh
-.venv/bin/python -m pytest -q tests/test_web_*.py
+uv run --no-sync python -m pytest -q tests/test_web_*.py
 ```
 
 They exercise real SQLite and process-crash boundaries but mock browser and model responses. They cannot establish live site compatibility, inference permissions, or successful journeys.

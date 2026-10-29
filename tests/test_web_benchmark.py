@@ -51,3 +51,9 @@ def test_lost_child_usage_stops_suite_before_any_later_request(tmp_path,monkeypa
     assert rows[0]['api_usage_unknown'] and not rows[0]['verified']
     stop=json.loads((folder/'suite-stop.json').read_text())
     assert stop['remaining_attempts_unrun']==9
+
+
+def test_unavailable_child_cpu_measurement_is_unknown_not_zero(monkeypatch):
+    from benchmarks import web
+    monkeypatch.setattr(web, 'resource', None)
+    assert web.children_cpu_seconds() is None

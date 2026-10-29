@@ -55,7 +55,7 @@ def workload(seed=42, tasks_per_split=30, trials=5):
 
 
 def read_jsonl(path):
-    return [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
+    return [json.loads(line) for line in Path(path).read_text(encoding='utf-8').splitlines() if line.strip()]
 
 
 def number(value, name):

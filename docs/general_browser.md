@@ -2,10 +2,11 @@
 
 Python 3.12、uv、Docker、既存のAzure CLIログインを使う。READMEのChrome imageと、Microsoft-Decision-1・gpt-4.1-miniの設定が必要。
 
+WindowsはPowerShellとDocker DesktopのWSL 2・Linuxコンテナを使う。`docker info --format '{{.OSType}}'`が`linux`を返すことを確認する。Windowsコンテナへの切替や個人Chromeへの接続は行わない。
+
 ```sh
 uv sync --locked --extra generic --python 3.12
-uv run --no-sync --env-file .env decision-browser-general \
-  --task examples/general-task.json --launch --output .audit/example-general
+uv run --no-sync --env-file .env decision-browser-general --task examples/general-task.json --launch --output .audit/example-general
 ```
 
 `--output`には新しいディレクトリを指定する。`--launch`は専用Chromeを起動し、終了時に削除する。`--manifest`では汎用モードの所有権確認済みChromeへ接続する。個人Chromeへの接続は行わない。
@@ -13,6 +14,8 @@ uv run --no-sync --env-file .env decision-browser-general \
 タスクJSONには`url`と自然文の`goal`を指定する。`allowed_origins`はscheme・host・portが一致する遷移先で、省略時は開始URLのoriginだけを許可する。外部サイトへの移動が必要なら先に追加する。公開HTTPSを利用し、内部IP宛の接続をプロキシで拒否する。HTTPの例外は専用fixtureの`127.0.0.1:8766`と`localhost:8766`だけ。
 
 ブラウザはリンク、入力、選択、キー、縦横スクロール、履歴、再読込、タブ、iframe、open Shadow DOMを扱う。`uploads`は任意のトークンと明示したローカル通常ファイルの対応表。`upload`はそのトークンだけを使い、ファイルをコンテナ内へ転送する。ダウンロードは`downloads/`へ回収する。1ファイル10 MiB、ダウンロード全体40 MiBを上限とする。
+
+WindowsのアップロードパスはJSON内で`C:/Users/name/specification.pdf`のように指定できる。symlink・reparse pointは拒否するため、クラウドのプレースホルダーは通常のローカルファイルへコピーする。ダウンロードの実ファイル名はOS間で衝突しないhash名にし、元の名前を結果の`name`へ残す。
 
 `output_schema`には参照を含まないJSON Schemaを指定できる。抽出データはスキーマ検証し、結果の`extracts`へ保存する。長いページは100,000文字ずつ抽出する。`vision: true`で観測画像もAzureのplannerへ送る。画像と観測本文、入力値は外部モデルへの送信対象になるため、公開・合成データを使う。
 

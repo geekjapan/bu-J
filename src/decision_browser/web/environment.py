@@ -13,12 +13,12 @@ CONTAINER_ID = re.compile(r"[0-9a-f]{64}\Z")
 
 
 def docker(*args, check=True, timeout=60):
-    return subprocess.run(["docker", *args], capture_output=True, text=True,
+    return subprocess.run(["docker", *args], capture_output=True, text=True, encoding='utf-8',
                           check=check, timeout=timeout)
 
 
 def save(path, value):
-    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding='utf-8')
 
 
 def _output(error, name):
@@ -78,7 +78,7 @@ def _validate(manifest, state, readiness, *, generic=False):
 
 
 def validate_manifest(path, *, generic=False):
-    manifest = json.loads(Path(path).read_text())
+    manifest = json.loads(Path(path).read_text(encoding='utf-8'))
     if not CONTAINER_ID.fullmatch(manifest.get("container", "")):
         raise ValueError("Invalid managed Chrome container ID")
     return _validate(manifest, inspect(manifest["container"]), ready(manifest["container"]), generic=generic)
