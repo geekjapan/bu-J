@@ -15,24 +15,28 @@ def origin(url: str) -> str:
     try:
         parsed = urlsplit(url)
         host, port = parsed.hostname, parsed.port
-        if (not url.isascii() or any(ord(c) <= 32 for c in url) or parsed.username is not None
-                or parsed.password is not None or not host or "\\" in url):
+        if (not url.isascii() or any(ord(c) <= 32 or ord(c) == 127 for c in url)
+                or parsed.scheme not in {"http", "https"} or port == 0 or parsed.username is not None
+                or parsed.password is not None or not host or "\\" in url or "%" in host):
             raise ValueError()
-        fixture = parsed.scheme == "http" and host in {"127.0.0.1", "localhost"} and port == 8766
-        if not fixture:
-            if parsed.scheme != "https" or port not in (None, 443):
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError:
+            labels = host.removesuffix(".").split(".")
+            if (len(host.removesuffix(".")) > 253 or ":" in host or "[" in parsed.netloc
+                    or any(not label or len(label) > 63 or label.startswith("-") or label.endswith("-")
+                           or not all(c.isalnum() or c == "-" for c in label) for label in labels)):
                 raise ValueError()
-            try:
-                address = ipaddress.ip_address(host)
-            except ValueError:
-                if not all(part and all(c.isalnum() or c == "-" for c in part) for part in host.split(".")):
-                    raise ValueError()
-            else:
-                if not address.is_global or address.is_reserved or address.is_multicast:
-                    raise ValueError()
-        return f"{parsed.scheme}://{host}" + (f":{port}" if port and port != 443 else "")
+            # Browsers reinterpret numeric hosts as IPv4; require their canonical address spelling.
+            if labels[-1].isdigit() or (labels[-1].startswith("0x")
+                                       and all(c in "0123456789abcdef" for c in labels[-1][2:])):
+                raise ValueError()
+        else:
+            host = f"[{address}]" if address.version == 6 else str(address)
+        default_port = 80 if parsed.scheme == "http" else 443
+        return f"{parsed.scheme}://{host}" + (f":{port}" if port is not None and port != default_port else "")
     except (ValueError, TypeError):
-        raise ValueError("public HTTPS URL required; only the owned fixture permits local HTTP") from None
+        raise ValueError("HTTP(S) URL with a valid host and port required") from None
 
 
 class Acceptance(StrictModel):

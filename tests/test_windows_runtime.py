@@ -84,7 +84,7 @@ async def execute(args, task, output, journal):
     save(output / 'docker.json', {'name': task.goal})
     return result
 cli.execute = execute
-raise SystemExit(cli.main(['--task', sys.argv[1], '--output', sys.argv[2], '--manifest', 'unused']))
+raise SystemExit(cli.main(['--task', sys.argv[1], '--output', sys.argv[2], '--cdp-url', 'ws://localhost:9222/devtools/browser/unused']))
 '''
     process = subprocess.run([sys.executable, '-c', script, str(task), str(output)],
                              capture_output=True, encoding='utf-8', timeout=15,

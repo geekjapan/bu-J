@@ -1,9 +1,9 @@
-"""Run a natural-language web task in an owned disposable Chrome."""
+"""Run a natural-language task in your existing browser."""
 from __future__ import annotations
 
 import argparse
 import asyncio
-from contextlib import ExitStack, nullcontext
+from contextlib import ExitStack
 import hashlib
 import json
 import os
@@ -15,7 +15,7 @@ from .journal import GeneralJournal
 from .models import Task
 from .provider import GeneralModelClient
 from .runtime import run
-from ..web.environment import ManagedChrome, validate_manifest
+from .connection import browser_identity, list_tabs, resolve_endpoint
 
 
 def save(path, value):
@@ -24,17 +24,16 @@ def save(path, value):
 
 async def execute(args, task, output, journal):
     from .browser import GeneralBrowser
-    context = ManagedChrome(output / "chrome", generic=True) if args.launch else nullcontext()
+    endpoint = await asyncio.to_thread(resolve_endpoint, args.cdp_url)
     result = {"status": "FAILED", "task_id": args.task_id}
-    with context as managed, ExitStack() as resources:
-        manifest = validate_manifest(managed.manifest_path if managed else args.manifest, generic=True)
+    with ExitStack() as resources:
         import portalocker
         locks = Path.home() / ".cache" / "bu-j" / "locks"
         locks.mkdir(parents=True, exist_ok=True, mode=0o700)
-        identity = hashlib.sha256(manifest["container"].encode()).hexdigest()
+        identity = hashlib.sha256(browser_identity(endpoint).encode()).hexdigest()
         resources.enter_context(portalocker.Lock(locks / (identity + ".lock"), timeout=0))
-        uploads, receipts = stage_uploads(manifest["container"], task.uploads)
-        browser = GeneralBrowser(manifest["endpoint"], task, uploads)
+        uploads, receipts = stage_uploads(output, task.uploads)
+        browser = GeneralBrowser(endpoint, task, uploads, tab_id=args.tab_id)
         model = GeneralModelClient(*(os.environ.get(name, "") for name in (
             "AZURE_ENDPOINT", "AZURE_DEPLOYMENT_NAME", "AZURE_TEXT_ENDPOINT", "AZURE_TEXT_DEPLOYMENT")),
             max_calls=task.max_steps, max_text_calls=20)
@@ -44,7 +43,8 @@ async def execute(args, task, output, journal):
         except Exception as error:
             result["error"] = {"type": type(error).__name__, "message": str(error)[:500]}
         finally:
-            for name, cleanup in (("downloads", lambda: collect_downloads(manifest["container"], output)),
+            for name, cleanup in (("downloads", lambda: collect_downloads(Path(args.downloads_dir) if args.downloads_dir else None,
+                browser.session.downloads if browser.session is not None else [], output)),
                                   ("browser", browser.close)):
                 try:
                     if name == "browser":
@@ -66,14 +66,24 @@ async def execute(args, task, output, journal):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--task", required=True, help="JSON task with url, goal and optional allowed_origins/acceptance/uploads")
-    parser.add_argument("--output", required=True, help="new evidence directory")
+    parser.add_argument("--task", help="JSON task with url, goal and optional allowed_origins/acceptance/uploads")
+    parser.add_argument("--output", help="new evidence directory")
     parser.add_argument("--journal", help="durable SQLite path; default OUTPUT/journal.sqlite3")
     parser.add_argument("--task-id", default=str(uuid4()))
-    browser = parser.add_mutually_exclusive_group(required=True)
-    browser.add_argument("--launch", action="store_true", help="launch and clean an owned Docker Chrome")
-    browser.add_argument("--manifest", help="attested running generic ManagedChrome manifest")
+    parser.add_argument("--cdp-url", help="existing Chrome CDP URL; otherwise discover the running browser")
+    parser.add_argument("--tab-id", help="use this existing tab without initial navigation")
+    parser.add_argument("--list-tabs", action="store_true", help="list existing tab IDs without running a task")
+    parser.add_argument("--downloads-dir", help="existing browser download folder; copy only matched completed downloads")
     args = parser.parse_args(argv)
+    if args.list_tabs:
+        try:
+            print(json.dumps(asyncio.run(list_tabs(resolve_endpoint(args.cdp_url)))))
+            return 0
+        except Exception as error:
+            print(json.dumps({"status": "FAILED", "error": {"type": type(error).__name__, "message": str(error)[:500]}}))
+            return 1
+    if not args.task or not args.output:
+        parser.error("--task and --output are required unless --list-tabs is used")
     output = Path(args.output)
     journal = None
     created = False

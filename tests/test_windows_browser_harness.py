@@ -120,3 +120,38 @@ def test_fixture_port_failure_retains_failure_proof_and_removes_only_profile(mon
     assert proof["cleanup"]["profile_absent"] is True
     assert untouched.is_dir()
     assert not profile.exists()
+
+
+async def test_existing_tabs_must_keep_form_session_url_and_viewport(monkeypatch):
+    expected = {"url": "http://localhost:8766/detail", "value": "untouched",
+                "session": "retained", "width": 1280, "height": 1000}
+    tabs = {"unrelated": {"id": "other", "session_id": "session", "before": expected}}
+    async def state(client, session):
+        return dict(expected)
+    async def command(*args, **kwargs):
+        return {"targetInfos": [{"targetId": "other"}]}
+    monkeypatch.setattr(harness, "tab_state", state)
+    monkeypatch.setattr(harness, "cdp_command", command)
+    await harness.assert_tabs_preserved(None, tabs)
+    assert tabs["unrelated"]["after"] == expected
+    expected_before = dict(expected)
+    tabs["unrelated"]["before"] = expected_before
+    expected["value"] = "lost"
+    with pytest.raises(AssertionError):
+        await harness.assert_tabs_preserved(None, tabs)
+
+
+async def test_list_tabs_uses_normal_cli_and_retains_receipt(monkeypatch, tmp_path):
+    endpoint = "ws://127.0.0.1:45678/devtools/browser/owned"
+    tabs = {"selected": {"id": "existing", "before": {"url": "http://localhost:8766/"}}}
+    inventory = [{"id": "existing", "url": "http://localhost:8766/", "title": "Fixture"}]
+    def run(command, **kwargs):
+        assert command == [harness.sys.executable, "-m", "decision_browser.general.cli",
+                           "--list-tabs", "--cdp-url", endpoint]
+        assert kwargs["timeout"] == 15
+        return SimpleNamespace(returncode=0, stdout=harness.json.dumps(inventory), stderr="")
+    monkeypatch.setattr(harness.subprocess, "run", run)
+    assert await harness.cli_inventory(endpoint, tabs, tmp_path) == inventory
+    receipt = harness.json.loads((tmp_path / "list-tabs.json").read_text())
+    assert receipt["returncode"] == 0
+    assert receipt["argv"][-2:] == ["--cdp-url", endpoint]

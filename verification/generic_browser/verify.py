@@ -11,7 +11,10 @@ import subprocess
 from uuid import uuid4
 
 from decision_browser.general.browser import GeneralBrowser
-from decision_browser.general.files import collect_downloads, stage_uploads
+if __package__:
+    from .container_files import DOWNLOAD_DIRECTORY, collect_downloads, stage_uploads
+else:
+    from container_files import DOWNLOAD_DIRECTORY, collect_downloads, stage_uploads
 from decision_browser.general.journal import GeneralJournal
 from decision_browser.general.models import ACTION, Task
 from decision_browser.web.environment import ManagedChrome, validate_manifest
@@ -29,7 +32,7 @@ async def drive(manifest, output):
     task = Task(url="http://127.0.0.1:8766/", goal="Exercise the procurement sandbox",
                 allowed_origins=["http://127.0.0.1:8766", "http://localhost:8766"],
                 uploads={"specification": str(upload)})
-    uploads, receipts = stage_uploads(manifest["container"], task.uploads)
+    uploads, receipts = stage_uploads(manifest["container"], output, task.uploads)
     browser = GeneralBrowser(manifest["endpoint"], task, uploads)
     journal = GeneralJournal(output / "journal.sqlite3")
     task_id = str(uuid4())
@@ -68,6 +71,9 @@ async def drive(manifest, output):
 
     try:
         await browser.start()
+        await browser.session._cdp_client_root.send.Browser.setDownloadBehavior(params={
+            "behavior": "allowAndName", "downloadPath": DOWNLOAD_DIRECTORY, "eventsEnabled": True,
+        })
         await act("navigate", url=task.url)
         await act("input", testid="requester-name", text="Mina Verification")
         await act("select", testid="department", value="Operations")
@@ -112,8 +118,10 @@ async def drive(manifest, output):
         assert final["last"]["request"]["department"] == "Operations"
         assert final["last"]["request"]["priority"] is True
         assert final["last"]["upload"]["sha256"] == receipts["specification"]["sha256"]
-        downloads = collect_downloads(manifest["container"], output)
-        assert downloads, "No real browser download collected"
+        downloads = collect_downloads(manifest["container"], browser.session.downloads, output)
+        assert downloads and all(item['copied'] for item in downloads), "No completed scoped browser download collected"
+        assert len(downloads) == 1, downloads
+        assert downloads[0]['sha256'] == final['last']['download']['sha256'], downloads
         image = base64.b64decode(await browser.screenshot(), validate=True)
         assert image.startswith(b"\x89PNG\r\n\x1a\n")
         (output / "final.png").write_bytes(image)

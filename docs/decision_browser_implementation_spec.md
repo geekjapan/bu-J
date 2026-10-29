@@ -9,7 +9,7 @@
 - 基本経路は、隔離した合成fixtureの検索・一覧抽出・ページ送り。既定CLIはMockで動く。
 - 固定Web経路はGoogle Flights、Wikipedia、ホテルfixtureの検索・閲覧を維持する。Flightsの比較日付は両実装で2027-09-20。
 - 汎用経路は任意URL・自然文goal・許可origin・明示したファイルを受ける。入力、フォーム送信、タブ、frame、抽出とファイル転送を扱い、固定タスクの知識を使わない。
-- ログイン、CAPTCHA突破、制限回避、任意コード実行、Skillの自己有効化、個人Chromeへの自動接続は対象外。外部への書込みは利用者が依頼した範囲に限定する。
+- CAPTCHA突破、制限回避、任意コード実行、Skillの自己有効化は対象外。汎用CLIは利用者がremote debuggingを許可した起動中のChromeへ接続し、既存のログイン状態を利用する。外部への書込みは利用者が依頼した範囲に限定する。
 - 汎用plannerは型付き候補と文字列・URLを生成できる。URL・観測済み要素index・許可ファイルを実行前に検査する。生成JavaScript・shell・CSS selectorは実行しない。
 
 ## 構成と契約

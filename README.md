@@ -1,78 +1,51 @@
 # bu-J
 
-A Python browser controller using Microsoft-Decision-1. Give an isolated Chrome a URL and a natural-language task. Includes an offline demo and fixed comparison tasks.
+A Python browser controller using Microsoft-Decision-1. Give it a URL and a natural-language goal to work in your running Chrome, with your existing profile and sign-in session.
 
-Microsoft-Decision-1でブラウザを操作するPython製Controllerです。専用ChromeへURLと自然文の目的を渡します。オフラインデモと固定の比較タスクも含みます。
+Microsoft-Decision-1でブラウザーを操作するPython製Controllerです。URLと自然文の目的を渡し、普段使っているChromeのプロファイルとログイン状態で作業します。
 
-## Driver setup / Driverの導入
+## Install / 導入
 
-The Driver runtime executes browser actions. Requires Python 3.12, uv, and Docker for real Chrome. Run from the repository root.
+Requires Python 3.12, uv, Chrome, and access to existing Azure deployments. Run from the checkout. Windows uses the same commands in PowerShell.
 
-Driverはブラウザ操作を実行する本体です。Python 3.12、uv、実Chrome用のDockerを用意し、リポジトリ直下で実行します。
-
-On Windows, use PowerShell and Docker Desktop with its WSL 2 Linux-container backend. Run the same `uv` commands; no virtual environment activation is required.
-
-WindowsではPowerShellと、WSL 2・Linuxコンテナ設定のDocker Desktopを使います。`uv`コマンドは共通で、仮想環境のactivateは不要です。
+Python 3.12、uv、Chromeと、既存Azure deploymentへの推論権限が必要です。checkoutの直下で実行します。WindowsでもPowerShellで同じコマンドを使います。
 
 ```sh
-uv sync --locked --extra web --extra generic --python 3.12
-uv run decision-browser-general --help
+uv sync --locked --extra generic --python 3.12
+uv run --no-sync decision-browser-general --help
 ```
 
-Run the offline demo. No Azure account or browser is required; the command returns four synthetic records.
+Sign in with Azure CLI. Copy [.env.example](.env.example) to `.env` and set `AZURE_ENDPOINT` and `AZURE_DEPLOYMENT_NAME` for Microsoft-Decision-1, plus `AZURE_TEXT_ENDPOINT` and `AZURE_TEXT_DEPLOYMENT` for an existing gpt-4.1-mini deployment. Task runs call these paid APIs.
 
-オフラインデモを実行します。Azureアカウントやブラウザは不要で、合成データ4件を返します。
-
-```sh
-uv run decision-browser --provider mock --mode enforced --routing rules --query a
-```
-
-Build the isolated Chrome image. It includes Google Chrome and Browser Harness; no host browser connection is required.
-
-専用Chrome imageを作成します。Google ChromeとBrowser Harnessはimage内に導入され、普段使いのブラウザには接続しません。
-
-```sh
-docker build --platform linux/amd64 -f verification/chrome/Dockerfile -t bu-j-chrome-verifier:local .
-```
-
-### Azure setup / Azureの設定
-
-Use an existing Microsoft-Decision-1 deployment with inference access. Sign in with Azure CLI, then create `.env` from [.env.example](.env.example) if needed and set `AZURE_ENDPOINT` and `AZURE_DEPLOYMENT_NAME`.
-
-推論権限のある既存のMicrosoft-Decision-1 deploymentを使います。Azure CLIでログインし、未設定なら[.env.example](.env.example)から`.env`を作り、`AZURE_ENDPOINT`と`AZURE_DEPLOYMENT_NAME`を設定します。
+Azure CLIでログインします。[.env.example](.env.example)を`.env`へコピーし、Microsoft-Decision-1の`AZURE_ENDPOINT`と`AZURE_DEPLOYMENT_NAME`、既存gpt-4.1-miniの`AZURE_TEXT_ENDPOINT`と`AZURE_TEXT_DEPLOYMENT`を設定します。タスク実行時には有料APIを呼びます。
 
 ```sh
 az login
-uv run --env-file .env decision-browser --provider azure --mode enforced --max-cost-units 10000
 ```
 
-This calls the paid Azure API with the synthetic browser. For real Chrome, set `AZURE_TEXT_ENDPOINT` and `AZURE_TEXT_DEPLOYMENT` to an existing gpt-4.1-mini deployment, then run the sample task.
+In your running Chrome, enable remote debugging at `chrome://inspect/#remote-debugging` and approve Chrome's connection prompt. See [Chrome's setup instructions](https://developer.chrome.com/blog/chrome-devtools-mcp-debug-your-browser-session). Edit the sample task's URL and goal, then run it. A working tab opens in that browser and remains open after completion.
 
-このコマンドは合成ブラウザで有料のAzure APIを呼びます。実Chromeには`AZURE_TEXT_ENDPOINT`と`AZURE_TEXT_DEPLOYMENT`へ既存のgpt-4.1-miniを設定し、サンプルタスクを実行します。
+起動中のChromeで`chrome://inspect/#remote-debugging`からremote debuggingを有効にし、Chromeの接続確認を承認します。[Chromeの設定手順](https://developer.chrome.com/blog/chrome-devtools-mcp-debug-your-browser-session)も参照してください。サンプルのURLと目的を編集して実行します。同じブラウザー内に作業タブが開き、終了後も残ります。
 
 ```sh
-uv run --no-sync --env-file .env decision-browser-general --task examples/general-task.json --launch --output .audit/example-general
+uv run --no-sync --env-file .env decision-browser-general --task examples/general-task.json --output .audit/example-general
 ```
 
-Edit the sample URL and goal for your task. See [task options](docs/general_browser.md). Use a new output directory for each run.
+Use a new output directory for each run. See [the browser task guide](docs/general_browser.md) for existing-tab selection, connection discovery, local files, and result checks. Docker is only optional infrastructure for the [historical fixed benchmarks](docs/web_benchmark.md).
 
-サンプルのURLと目的を編集して使います。[タスクの指定方法](docs/general_browser.md)を参照してください。出力先は毎回新しいディレクトリにします。
+出力先は毎回新しいディレクトリにします。既存タブの選択、接続先の検出、ローカルファイル、結果の確認は[タスクガイド](docs/general_browser.md)を参照してください。Dockerは[従来の固定ベンチマーク](docs/web_benchmark.md)用の任意の環境です。
 
-## Skill setup / Skillの導入
+## Install the skill / Skillの導入
 
-The Skill teaches your agent how to use the Driver. Requires Node.js 22.20+ with npx; install the Driver above separately.
+Requires Node.js 22.20+ with npx. Select the target agent, start a new session in the checkout, and ask it to use the `bu-j` skill.
 
-SkillはDriverの使い方をエージェントへ伝えます。Node.js 22.20以降とnpxが必要です。Driver本体は上の手順で別途導入します。
-
-Install for your user account, select the target agent, then start a new agent session in the bu-J checkout and ask it to use the `bu-j` skill.
-
-ユーザー単位で導入して対象エージェントを選び、bu-Jのcheckoutで新しいセッションを開いて「bu-j Skillを使って」と依頼します。
+Node.js 22.20以降とnpxが必要です。対象エージェントを選択し、checkoutで新しいセッションを開いて「bu-j Skillを使って」と依頼します。
 
 ```sh
 npx skills add geekjapan/bu-J --skill bu-j --global
 npx skills list --global
 ```
 
-For a project-only install, omit `--global` and run in that project. The Skill does not install Python dependencies, Chrome, or Azure credentials.
+For a project-only install, omit `--global`. The skill provides agent instructions; install the Python runtime and configure Chrome and Azure separately as above.
 
-特定プロジェクトだけで使う場合は、その直下で`--global`を省いて実行します。SkillだけではPython依存、Chrome、Azure認証は導入されません。
+プロジェクト内だけで使う場合は`--global`を省きます。Skillはエージェントへの手順です。Python本体と依存、Chrome、Azureは上の手順で別途設定します。

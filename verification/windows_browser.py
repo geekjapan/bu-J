@@ -13,6 +13,7 @@ from pathlib import Path
 import platform
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -110,7 +111,79 @@ def cleanup_chrome(process, profile):
             "tracked_pids": sorted(tracked)}
 
 
+async def cdp_command(client, domain, method, params=None, session_id=None):
+    command = getattr(getattr(client.send, domain), method)
+    return await asyncio.wait_for(command(params=params or {}, session_id=session_id), 15)
+
+
+async def tab_state(client, session_id):
+    result = await cdp_command(client, "Runtime", "evaluate", {
+        "expression": """({url:location.href, value:document.querySelector('input')?.value,
+            session:sessionStorage.getItem('windows-verification'),
+            width:innerWidth, height:innerHeight})""", "returnByValue": True,
+    }, session_id)
+    assert not result.get("exceptionDetails"), result
+    return result["result"]["value"]
+
+
+async def seed_existing_tabs(client, url):
+    tabs = {}
+    for label, path in (("selected", "?borrowed=1"), ("unrelated", "detail?unrelated=1")):
+        target = await cdp_command(client, "Target", "createTarget", {"url": url + path})
+        attached = await cdp_command(client, "Target", "attachToTarget", {
+            "targetId": target["targetId"], "flatten": True})
+        session_id = attached["sessionId"]
+        deadline = time.monotonic() + 15
+        while True:
+            ready = await cdp_command(client, "Runtime", "evaluate", {
+                "expression": "document.readyState === 'complete' && location.href !== 'about:blank'",
+                "returnByValue": True}, session_id)
+            if ready["result"].get("value"):
+                break
+            if time.monotonic() >= deadline:
+                raise TimeoutError("Existing fixture tab did not load")
+            await asyncio.sleep(.1)
+        result = await cdp_command(client, "Runtime", "evaluate", {
+            "expression": """(() => {
+                const input = document.querySelector('input') || document.body.appendChild(document.createElement('input'));
+                input.value = %s;
+                sessionStorage.setItem('windows-verification', %s);
+            })()""" % (json.dumps(label + " form"), json.dumps(label + " session")),
+        }, session_id)
+        assert not result.get("exceptionDetails"), result
+        tabs[label] = {"id": target["targetId"], "session_id": session_id,
+                       "before": await tab_state(client, session_id)}
+    return tabs
+
+
+async def assert_tabs_preserved(client, tabs):
+    for tab in tabs.values():
+        tab["after"] = await tab_state(client, tab["session_id"])
+        assert tab["after"] == tab["before"], tab
+    targets = await cdp_command(client, "Target", "getTargets")
+    ids = {target["targetId"] for target in targets["targetInfos"]}
+    assert all(tab["id"] in ids for tab in tabs.values()), targets
+
+
+async def cli_inventory(endpoint, tabs, output):
+    command = [sys.executable, "-m", "decision_browser.general.cli", "--list-tabs", "--cdp-url", endpoint]
+    result = await asyncio.to_thread(subprocess.run, command, capture_output=True, text=True,
+                                     encoding="utf-8", timeout=15)
+    receipt = {"argv": command, "returncode": result.returncode,
+               "stdout": result.stdout, "stderr": result.stderr}
+    (output / "list-tabs.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    assert result.returncode == 0, receipt
+    inventory = json.loads(result.stdout)
+    by_id = {tab["id"]: tab for tab in inventory}
+    for tab in tabs.values():
+        assert by_id[tab["id"]]["url"] == tab["before"]["url"], inventory
+    return inventory
+
+
 async def drive(endpoint, output):
+    from cdp_use import CDPClient
+
+    inspector = CDPClient(endpoint)
     task = Task(url="http://127.0.0.1:8766/", goal="Verify native Chrome transport",
                 allowed_origins=["http://127.0.0.1:8766", "http://localhost:8766"])
     browser = GeneralBrowser(endpoint, task, {})
@@ -151,7 +224,26 @@ async def drive(endpoint, output):
         return await observe()
 
     try:
+        await asyncio.wait_for(inspector.start(), 15)
+        existing_tabs = await seed_existing_tabs(inspector, task.url)
+        inventory = await cli_inventory(endpoint, existing_tabs, output)
+        borrowed = GeneralBrowser(endpoint, task, {}, tab_id=existing_tabs["selected"]["id"])
+        try:
+            await asyncio.wait_for(borrowed.start(), 60)
+            page = await asyncio.wait_for(borrowed.observe(), 15)
+            assert page["url"] == existing_tabs["selected"]["before"]["url"]
+            assert {tab["tab_id"] for tab in page["tabs"]} == {existing_tabs["selected"]["id"]}
+            await assert_tabs_preserved(inspector, existing_tabs)
+        finally:
+            await asyncio.wait_for(borrowed.close(), 5)
+        await assert_tabs_preserved(inspector, existing_tabs)
+        (output / "existing-tabs.json").write_text(json.dumps({
+            "borrowed_startup_preserved": True, "browser_alive_after_borrowed_close": True,
+            "tabs": existing_tabs}, indent=2) + "\n", encoding="utf-8")
         await asyncio.wait_for(browser.start(), 60)
+        initial = await observe()
+        assert initial["target_id"] is None and initial["tabs"] == [] and initial["nodes"] == {}
+        await assert_tabs_preserved(inspector, existing_tabs)
         await act("navigate", url=task.url)
         await act("input", "requester-name", text="Windows Verification")
         await act("select", "department", value="Operations")
@@ -191,8 +283,12 @@ async def drive(endpoint, output):
         image = base64.b64decode(await asyncio.wait_for(browser.screenshot(), 15), validate=True)
         assert image.startswith(b"\x89PNG\r\n\x1a\n")
         (output / "final.png").write_bytes(image)
+        await asyncio.wait_for(browser.close(), 5)
+        await assert_tabs_preserved(inspector, existing_tabs)
         journal.finish(task_id, "VERIFIED")
         return {"steps": steps, "before": before, "after": after,
+                "existing_tabs": existing_tabs, "cli_inventory": inventory,
+                "browser_alive_after_adapter_close": True,
                 "scroll": {"before": before_scroll, "after": after_scroll},
                 "screenshot_sha256": hashlib.sha256(image).hexdigest()}
     finally:
@@ -200,6 +296,7 @@ async def drive(endpoint, output):
             await asyncio.wait_for(browser.close(), 5)
         finally:
             journal.close()
+            await asyncio.wait_for(inspector.stop(), 5)
 
 
 def main(argv=None):
@@ -213,7 +310,8 @@ def main(argv=None):
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     proof = {"passed": False, "os": platform.platform(), "python": platform.python_version(),
-             "scope": "native Windows CDP adapter; Docker Desktop and file transfer are separate",
+             "scope": "native Windows existing-browser adapter using a test-only owned profile; "
+                      "personal-profile discovery and file transfer are separate; Docker is not required",
              "model_calls": 0, "executable": executable}
     profile = Path(tempfile.mkdtemp(prefix="bu-j-windows-chrome-"))
     process = None

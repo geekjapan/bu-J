@@ -75,7 +75,9 @@ def browser():
     dom = SimpleNamespace(selector_map={1: node}, llm_representation=lambda: '[1]<input type=text> form text')
     raw = SimpleNamespace(url=URL, title='Form', tabs=[SimpleNamespace(target_id=TAB, url=URL, title='Form')], dom_state=dom, state_error=None)
     instance.session = SimpleNamespace(
-        agent_focus_target_id=TAB, get_current_page_url=AsyncMock(return_value=URL), get_all_frames=AsyncMock(return_value=({'frame': {'url': URL}}, {})),
+        agent_focus_target_id=TAB, task_target_ids={TAB}, created_target_ids={TAB},
+        get_root_cdp_session=AsyncMock(return_value=SimpleNamespace(session_id=None, cdp_client=cdp.cdp_client)),
+        attach_task_target=AsyncMock(), get_current_page_url=AsyncMock(return_value=URL), get_all_frames=AsyncMock(return_value=({'frame': {'url': URL}}, {})),
         get_browser_state_summary=AsyncMock(return_value=raw), get_or_create_cdp_session=AsyncMock(return_value=cdp),
         cdp_client_for_node=AsyncMock(return_value=cdp), take_screenshot=AsyncMock(return_value=b'png'), stop=AsyncMock(),
     )
@@ -205,7 +207,8 @@ async def test_tampered_or_evicted_observation_never_mutates(browser):
 async def test_nonindexed_actions_send_expected_command_once(browser, payload, method):
     result = await execute(browser, payload)
     assert result['returned'] is True
-    assert [m for _, m, _ in mutations(browser)] == [method]
+    expected = ['createTarget', 'navigate'] if method == 'createTarget' else [method]
+    assert [m for _, m, _ in mutations(browser)] == expected
 
 
 async def test_select_and_upload_use_captured_node(browser):
@@ -264,13 +267,11 @@ async def test_foreign_form_destination_prevents_input(browser, kind):
 
 @pytest.mark.parametrize('endpoint', ['', 'file:///tmp/chrome', 'http://user:password@localhost:9222'])
 def test_missing_or_non_cdp_endpoint_cannot_launch_personal_browser(endpoint):
-    with pytest.raises(ValueError, match='Explicit owned'):
+    with pytest.raises(ValueError, match='Explicit existing browser'):
         GeneralBrowser(endpoint, Task(url=URL, goal='form'), {})
 
 
 async def test_start_only_connects_without_navigating(browser, monkeypatch):
-    import sys
-
     session = browser.session
     session.start = AsyncMock()
     session.get_tabs = AsyncMock(return_value=browser.raw.tabs)
@@ -288,7 +289,12 @@ async def test_start_only_connects_without_navigating(browser, monkeypatch):
     assert captured_options['keep_alive'] is True
     assert captured_options['enable_default_extensions'] is False
     assert captured_options['auto_download_pdfs'] is False
-    assert captured_options['downloads_path'] == '/tmp/bu-j-downloads'
+    assert 'downloads_path' not in captured_options
+    assert captured_options['target_id'] is None
+    assert captured_options['no_viewport'] is True
+    assert captured_options['highlight_elements'] is False
+    assert captured_options['dom_highlight_elements'] is False
+    session.get_tabs.assert_not_awaited()
 
 
 async def test_blank_observation_only_before_first_explicit_navigation(browser):
@@ -383,4 +389,150 @@ async def test_changed_live_input_state_is_rejected_after_snapshot(browser, chan
     browser.fake.guard.update(change)
     with pytest.raises(NotDispatched, match='node changed'):
         await browser.execute(ACTION.validate_python({'kind': 'click', 'index': 1}), observed)
+    assert not mutations(browser)
+
+
+async def test_bootstrap_observation_reads_no_existing_tabs(browser):
+    browser.session.agent_focus_target_id = None
+    view = await browser.observe()
+    assert view['url'] == 'about:blank'
+    assert view['target_id'] is None and view['nodes'] == {} and view['tabs'] == []
+    assert view['dom'] == view['text'] == ''
+    browser.session.get_all_frames.assert_not_awaited()
+    browser.session.get_browser_state_summary.assert_not_awaited()
+    assert not browser.fake.calls
+    await browser.close()
+    browser.session.stop.assert_awaited_once()
+    assert not mutations(browser)
+
+
+async def test_bootstrap_navigate_creates_blank_then_attaches_then_navigates(browser):
+    browser.session.agent_focus_target_id = None
+
+    async def attach(target_id, *, created):
+        assert target_id == 'NEW-FULL-TARGET' and created is True
+        assert browser.created_tab_id == target_id
+        assert [m for _, m, _ in mutations(browser)] == ['createTarget']
+        browser.session.task_target_ids.add(target_id)
+        browser.session.created_target_ids.add(target_id)
+
+    browser.session.attach_task_target.side_effect = attach
+    result = await execute(browser, {'kind': 'navigate', 'url': URL})
+    assert mutations(browser) == [
+        ('Target', 'createTarget', {'url': 'about:blank', 'background': True}),
+        ('Page', 'navigate', {'url': URL}),
+    ]
+    assert browser.fake.calls[0][3] is None
+    assert result['created_tab_id'] == 'NEW-FULL-TARGET'
+    assert result['user_browser_kept_alive'] is True
+    assert browser.session.agent_focus_target_id == 'NEW-FULL-TARGET'
+    await browser.close()
+    assert len(mutations(browser)) == 2
+
+
+@pytest.mark.parametrize('failure', ['createTarget', 'attach', 'navigate'])
+async def test_tab_creation_failures_never_retry_or_cleanup(browser, failure):
+    browser.session.agent_focus_target_id = None
+    view = await browser.observe()
+    if failure == 'attach':
+        browser.session.attach_task_target.side_effect = RuntimeError('attach failed')
+    else:
+        browser.fake.fail = failure
+    action = ACTION.validate_python({'kind': 'navigate', 'url': URL})
+    with pytest.raises(RuntimeError):
+        await browser.execute(action, view)
+    with pytest.raises(NotDispatched, match='Unknown observation'):
+        await browser.execute(action, view)
+    await browser.close()
+    assert sum(m == 'createTarget' for _, m, _ in mutations(browser)) == 1
+    assert not any(m in ('closeTarget', 'activateTarget') for _, m, _ in mutations(browser))
+    assert browser.created_tab_id == (None if failure == 'createTarget' else 'NEW-FULL-TARGET')
+
+
+@pytest.mark.parametrize('tamper', [False, True])
+async def test_bootstrap_validation_precedes_target_creation(browser, tamper):
+    browser.session.agent_focus_target_id = None
+    view = await browser.observe()
+    if tamper:
+        view['text'] = 'tampered'
+    action = ACTION.validate_python({'kind': 'navigate', 'url': URL if tamper else 'https://other.example/'})
+    with pytest.raises(NotDispatched):
+        await browser.execute(action, view)
+    assert not browser.fake.calls
+    browser.session.get_root_cdp_session.assert_not_awaited()
+
+
+async def test_borrowed_tab_observation_preserves_state_and_cannot_close(browser, monkeypatch):
+    browser.tab_id = TAB
+    browser.session.created_target_ids.clear()
+    browser.node.attributes['value'] = 'unsaved text'
+    browser.raw.url = URL + '?unsaved'
+    browser.session.start = AsyncMock()
+    options = {}
+
+    def construct(**kwargs):
+        options.update(kwargs)
+        return browser.session
+
+    monkeypatch.setattr('decision_browser.general.session.make_session', construct)
+    await browser.start()
+    view = await browser.observe()
+    assert options['target_id'] == TAB
+    assert view['url'] == URL + '?unsaved'
+    assert view['nodes']['1']['attrs']['value'] == 'unsaved text'
+    assert not mutations(browser)
+    with pytest.raises(NotDispatched, match='Borrowed'):
+        await browser.execute(ACTION.validate_python({'kind': 'close_tab', 'tab_id': TAB}), view)
+    await browser.close()
+    assert not mutations(browser)
+
+
+@pytest.mark.parametrize('kind', ['close_tab', 'switch_tab'])
+async def test_unrelated_observed_tab_is_never_adopted(browser, kind):
+    browser.raw.tabs.append(SimpleNamespace(target_id='FOREIGN', url='https://other.example/private', title='Private'))
+    view = await browser.observe()
+    assert [t['tab_id'] for t in view['tabs']] == [TAB]
+    assert 'Private' not in str(view)
+    with pytest.raises(NotDispatched, match='scoped'):
+        await browser.execute(ACTION.validate_python({'kind': kind, 'tab_id': 'FOREIGN'}), view)
+    assert not mutations(browser)
+
+
+@pytest.mark.parametrize('path', [r'C:\Users\Alice\task uploads\file.txt', '/Users/alice/task uploads/file.txt'])
+async def test_upload_uses_exact_trusted_staged_local_path(browser, path):
+    browser.uploads['file'] = path
+    browser.node.attributes = {'type': 'file'}
+    browser.fake.guard['attrs'] = {'type': 'file'}
+    await execute(browser, {'kind': 'upload', 'index': 1, 'file': 'file'})
+    assert mutations(browser)[-1][2]['files'] == [path]
+
+
+async def test_password_metadata_redacted_but_local_capture_preserved(browser):
+    browser.node.attributes = {'type': 'password', 'value': 'local-password-value'}
+    browser.fake.guard['attrs'] = dict(browser.node.attributes)
+    browser.raw.dom_state.llm_representation = lambda: '[1]<input type=password>'
+    view = await browser.observe()
+    assert 'value' not in view['nodes']['1']['attrs']
+    assert 'local-password-value' not in str(view)
+    captured = browser._captures[view['fingerprint']][1][1]
+    assert captured.attributes['value'] == 'local-password-value'
+    for payload in ({'kind': 'input', 'index': 1, 'text': 'secret'}, {'kind': 'key', 'key': 'Enter'}):
+        with pytest.raises(NotDispatched):
+            await browser.execute(ACTION.validate_python(payload), view)
+    assert not mutations(browser)
+
+
+async def test_explicit_scroll_foregrounds_scoped_page_before_wheel(browser):
+    await execute(browser, {'kind': 'scroll', 'dy': 100})
+    methods = [method for _, method, _, _ in browser.fake.calls]
+    assert methods[-2:] == ['bringToFront', 'dispatchMouseEvent']
+    assert browser.fake.calls[-2][3] == 'captured-session'
+
+
+async def test_invalid_scroll_target_does_not_foreground_or_send_wheel(browser):
+    view = await browser.observe()
+    browser.fake.guard['hit'] = False
+    with pytest.raises(NotDispatched):
+        await browser.execute(ACTION.validate_python({'kind': 'scroll', 'index': 1, 'dy': 100}), view)
+    assert not any(method == 'bringToFront' for _, method, _, _ in browser.fake.calls)
     assert not mutations(browser)

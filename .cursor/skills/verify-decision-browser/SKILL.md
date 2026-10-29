@@ -68,7 +68,7 @@ and hotel comparison, use [the web journey](features/web.md). Its live calls are
 separate from the offline helper and legacy formal coverage.
 
 For `decision-browser-general`, use [the general browser journey](features/general.md).
-It verifies the new owned Chrome adapter. Its API planner acceptance is separate.
+It covers attachment to the running browser, explicit existing-tab selection, local files, and retained tabs after disconnect. Its API planner acceptance is separate. Docker recipes are optional historical tests, not setup for this CLI.
 
 ## Evidence
 

@@ -4,7 +4,7 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from decision_browser.general.models import ACTION, Task
+from decision_browser.general.models import ACTION, Task, origin
 from decision_browser.general.provider import GeneralModelClient
 from decision_browser.web.provider import ProviderError
 
@@ -15,15 +15,56 @@ PAGE = {'url': URL, 'text': 'Name', 'nodes': {'1': {'tag': 'input'}}}
 
 
 @pytest.mark.parametrize('url', [
-    'file:///etc/passwd', 'javascript:alert(1)', 'http://example.test/',
-    'https://127.0.0.1/', 'https://169.254.169.254/latest/meta-data/',
-    'https://[::1]/', 'https://192.168.1.1/', 'https://user:password@example.test/',
-    'https://example.test:8443/', 'https://example.test/\nheader',
+    'file:///etc/passwd', 'javascript:alert(1)', 'data:text/plain,private',
+    'devtools://devtools/bundled/inspector.html', 'https://user:password@example.test/',
+    'https://example.test/\nheader', 'https://example.test/\x7fheader',
+    'http:///missing-host', 'http://bad_host/', 'http://-bad.test/', 'http://bad-.test/',
+    'http://example..test/', 'http://example.test:0/', 'http://example.test:65536/', 'http://example.test:invalid/',
+    'http://127.1/', 'http://2130706433/', 'http://0x7f000001/',
+    'http://[fe80::1%eth0]/',
     'https://example.test\\@127.0.0.1/',
 ])
 def test_task_rejects_unsafe_start_urls(url):
     with pytest.raises(ValidationError):
         Task(url=url, goal='Read page')
+
+
+@pytest.mark.parametrize('url,expected', [
+    ('http://localhost:5173/form', 'http://localhost:5173'),
+    ('http://127.0.0.1:54321/form', 'http://127.0.0.1:54321'),
+    ('http://intranet/dashboard', 'http://intranet'),
+    ('http://internal.example:8080/form', 'http://internal.example:8080'),
+    ('https://192.168.1.1:8443/settings', 'https://192.168.1.1:8443'),
+    ('https://169.254.169.254/latest/meta-data/', 'https://169.254.169.254'),
+    ('http://[::1]:5173/form', 'http://[::1]:5173'),
+    ('https://[2001:0DB8:0:0:0:0:0:1]:443/form', 'https://[2001:db8::1]'),
+    ('http://LOCALHOST:80/form', 'http://localhost'),
+    ('https://INTERNAL.example:443/form', 'https://internal.example'),
+    ('http://localhost:443/', 'http://localhost:443'),
+    ('https://localhost:80/', 'https://localhost:80'),
+])
+def test_task_supports_browser_http_origins(url, expected):
+    assert origin(url) == expected
+    task = Task(url=url, goal='Read page')
+    assert task.allowed_origins == [expected]
+    task.check_url(expected + '/another')
+
+
+@pytest.mark.parametrize('allowed', [
+    'http://localhost:80', 'https://localhost:443', 'http://LOCALHOST',
+    'http://[0:0:0:0:0:0:0:1]:5173', 'http://localhost:5173/',
+])
+def test_allowed_origins_require_canonical_exact_spelling(allowed):
+    with pytest.raises(ValidationError, match='exact origins'):
+        Task(url=allowed + '/form', goal='Read page', allowed_origins=[allowed])
+
+
+def test_internal_origin_scope_preserves_scheme_host_and_port():
+    task = Task(url='http://intranet:8080/form', goal='Read page')
+    task.check_url('http://intranet:8080/another')
+    for url in ('http://intranet:8081/', 'https://intranet:8080/', 'http://other:8080/'):
+        with pytest.raises(ValueError, match='outside task allowed_origins'):
+            task.check_url(url)
 
 
 @pytest.mark.parametrize('change', [
